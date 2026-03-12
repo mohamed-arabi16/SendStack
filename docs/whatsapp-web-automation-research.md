@@ -84,7 +84,9 @@ Transform the WhatsApp mode from "open wa.me links" to **fully automated WhatsAp
 
 > Reference URL: `https://www.codersllc.com/program/wpc`
 
-The **WPC (WhatsApp Phone Companion)** by CodersLLC appears to be a desktop/web program that automates WhatsApp Web for bulk messaging and campaign management. Based on the naming and similar tools in the market, programs like WPC typically:
+> ⚠️ **Disclaimer:** The reference website was inaccessible during research. The analysis below is **speculative**, based on the URL naming convention and industry knowledge of similar WhatsApp automation tools. This section should be verified once the site becomes accessible.
+
+The **WPC** by CodersLLC likely refers to a WhatsApp automation program. Based on similar tools in the market, programs like this typically:
 
 - **Automate WhatsApp Web** through browser automation (Puppeteer/Selenium)
 - **Authenticate via QR code** scan (same as WhatsApp Web)
@@ -94,9 +96,7 @@ The **WPC (WhatsApp Phone Companion)** by CodersLLC appears to be a desktop/web 
 - **Provide analytics** on sent/delivered/failed messages
 - **Handle anti-spam measures** with random delays and message variations
 
-This is essentially what we aim to build into our existing app. The core technology behind tools like WPC is the same as what `whatsapp-web.js` provides — browser automation of WhatsApp Web.
-
-> **Note:** The reference website was inaccessible during research. The analysis above is based on the URL naming convention ("wpc" = WhatsApp Phone Companion) and industry knowledge of similar tools.
+The core technology behind such tools is generally the same as what `whatsapp-web.js` provides — browser automation of WhatsApp Web. Our goal is to build similar functionality into our existing app.
 
 ---
 
@@ -321,7 +321,7 @@ src/
 | `whatsapp-web.js` | ^1.34.6 | WhatsApp Web automation | ~2MB |
 | `qrcode` | ^1.5.4 | Convert QR string to displayable image | ~200KB |
 
-> **Note:** `whatsapp-web.js` will install `puppeteer` as a transitive dependency, which downloads Chromium (~280MB). This is a one-time download.
+> **Note:** `whatsapp-web.js` will install `puppeteer` as a transitive dependency, which downloads a Chromium binary. This is a one-time download but can be large (check the [Puppeteer docs](https://pptr.dev/) for current sizes). Alternatively, `puppeteer-core` can be used with a system-installed Chrome to avoid the download.
 
 ---
 
