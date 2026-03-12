@@ -28,7 +28,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 1: Create the Extension Manifest and Build Pipeline
 
-- [ ] **Set up `manifest.json` (Manifest V3) and a Webpack/Vite build pipeline**
+- [x] **Set up `manifest.json` (Manifest V3) and a Webpack/Vite build pipeline**
 
   The extension must be built as a standard Chrome MV3 extension. The build output
   goes into a `chrome-extension/dist/` folder that can be loaded unpacked in Chrome.
@@ -93,7 +93,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 2: Implement the Service Worker (Background Script)
 
-- [ ] **Create `src/background.ts`** — the persistent service worker that coordinates all extension logic.
+- [x] **Create `src/background.ts`** — the persistent service worker that coordinates all extension logic.
 
   Responsibilities:
   - Listen for `chrome.runtime.onInstalled` to set default settings in `chrome.storage.sync`.
@@ -126,7 +126,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 3: Create the Gmail Content Script
 
-- [ ] **Create `src/content-gmail.ts`** — injected into `mail.google.com` to add the sidebar panel.
+- [x] **Create `src/content-gmail.ts`** — injected into `mail.google.com` to add the sidebar panel.
 
   The content script must:
   1. Detect when Gmail has fully loaded (wait for the compose toolbar or inbox to appear).
@@ -150,7 +150,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 4: Implement Bulk Email Sending via Gmail Compose
 
-- [ ] **Add bulk email logic to the Gmail content script**
+- [x] **Add bulk email logic to the Gmail content script**
 
   The bulk email flow:
   1. Panel sends `START_EMAIL_JOB` message to the content script with contacts and template.
@@ -181,7 +181,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 5: Create the WhatsApp Web Content Script
 
-- [ ] **Create `src/content-whatsapp.ts`** — injected into `web.whatsapp.com` to automate messaging.
+- [x] **Create `src/content-whatsapp.ts`** — injected into `web.whatsapp.com` to automate messaging.
 
   The content script must:
   1. Detect when WhatsApp Web has fully loaded (wait for the chat list to appear).
@@ -205,7 +205,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 6: Implement Bulk WhatsApp Sending
 
-- [ ] **Add bulk WhatsApp send logic to the WhatsApp content script**
+- [x] **Add bulk WhatsApp send logic to the WhatsApp content script**
 
   Mirror the Gmail bulk flow (Task 4) but for WhatsApp:
   1. Panel sends `START_WA_JOB` message to the content script.
@@ -237,7 +237,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 7: Build the Shared React Sidebar Panel
 
-- [ ] **Create `src/panel/App.tsx`** — the React component that serves as the UI for both Gmail and WhatsApp Web.
+- [x] **Create `src/panel/App.tsx`** — the React component that serves as the UI for both Gmail and WhatsApp Web.
 
   The panel must include all the controls already present in the web app's `EmailDashboard.tsx`:
 
@@ -268,7 +268,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 8: Implement the Toolbar Popup
 
-- [ ] **Create `src/popup/Popup.tsx`** — the small UI shown when the extension icon is clicked.
+- [x] **Create `src/popup/Popup.tsx`** — the small UI shown when the extension icon is clicked.
 
   The popup must show:
   1. **Status indicator** — whether the user is on Gmail or WhatsApp Web, with a link to open the site.
@@ -287,7 +287,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 9: Implement the Options Page
 
-- [ ] **Create `src/options/Options.tsx`** — the full-featured settings page.
+- [x] **Create `src/options/Options.tsx`** — the full-featured settings page.
 
   Settings to configure:
 
@@ -317,7 +317,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 10: Implement In-Extension CSV Parsing and Storage
 
-- [ ] **Create `src/lib/csv-parser.ts` and integrate with `chrome.storage.local`**
+- [x] **Create `src/lib/csv-parser.ts` and integrate with `chrome.storage.local`**
 
   - Reuse the `papaparse` library for CSV parsing.
   - Parse the CSV in the panel (browser context) — no server call needed.
@@ -344,7 +344,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 11: Implement Least-Privilege Permissions and Content Security Policy
 
-- [ ] **Audit and lock down the extension's permissions and CSP**
+- [x] **Audit and lock down the extension's permissions and CSP**
 
   Permissions audit:
   - Use `"activeTab"` instead of `"tabs"` wherever possible to minimise permissions.
