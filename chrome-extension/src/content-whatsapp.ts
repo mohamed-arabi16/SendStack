@@ -93,7 +93,7 @@ async function processCurrentContact(): Promise<void> {
   if (dailySent >= dailyLimit) {
     window.postMessage({
       type: 'BULK_SENDER_PROGRESS', current: job.currentIndex + 1, total,
-      sent, failed: failed + 1, status: 'skipped', recipient: phone, error: 'Daily limit reached',
+      sent, failed, status: 'skipped', recipient: phone, error: 'Daily limit reached',
     }, '*');
     await sendToBackground('CANCEL_WA_JOB', {});
     window.postMessage({ type: 'BULK_SENDER_COMPLETE', sent, failed, skipped: total - job.currentIndex }, '*');

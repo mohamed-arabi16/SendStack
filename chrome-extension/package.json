@@ -5,7 +5,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit --project tsconfig.tests.json",
     "test:e2e": "playwright test"
   },
   "dependencies": {

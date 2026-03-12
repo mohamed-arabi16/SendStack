@@ -60,6 +60,16 @@ test.describe('WhatsApp bulk send', () => {
     // Wait for the toggle button (confirms content-script injection)
     await page.waitForSelector('#bulk-sender-toggle', { timeout: 20000 });
 
+    // Set up a BULK_SENDER_COMPLETE listener before triggering the job
+    await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__waDone = false;
+      window.addEventListener('message', (e) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((e.data as any)?.type === 'BULK_SENDER_COMPLETE') (window as any).__waDone = true;
+      });
+    });
+
     // Trigger the WhatsApp bulk-send job
     await page.evaluate(
       ([contacts, settings]) => {
@@ -71,20 +81,12 @@ test.describe('WhatsApp bulk send', () => {
       [CONTACTS, WA_SETTINGS] as [typeof CONTACTS, typeof WA_SETTINGS]
     );
 
-    // Wait until we have seen 3 /send?phone=... navigations
-    // (Each represents one call to sendViaWhatsAppWeb / processCurrentContact)
+    // Wait for all 3 contacts to be processed (BULK_SENDER_COMPLETE fired)
     await page.waitForFunction(
-      () => {
-        // The last page will post BULK_SENDER_COMPLETE to its window
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const w = window as any;
-        return w.__waSendClicks !== undefined && w.__waSendClicks > 0;
-      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      () => (window as any).__waDone === true,
       { timeout: 30000 }
     );
-
-    // Allow the final navigation's send to register
-    await page.waitForTimeout(2000);
 
     // All three phone numbers should have been navigated to
     expect(phonesSeen).toContain('14155551234');
