@@ -6,24 +6,29 @@ import { DEFAULT_SETTINGS } from '../lib/storage';
 export default function Options() {
   const [settings, setSettings] = useState<ExtensionSettings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{ delay?: string; batchSize?: string }>({});
 
   useEffect(() => {
     sendToBackground<ExtensionSettings>('GET_SETTINGS').then(setSettings).catch(console.error);
   }, []);
 
   async function handleSave() {
-    if (settings.customDelaySeconds < 3) { alert('Delay must be at least 3 seconds.'); return; }
-    if (settings.batchSize < 5) { alert('Batch size must be at least 5.'); return; }
+    const errors: { delay?: string; batchSize?: string } = {};
+    if (settings.customDelaySeconds < 3) errors.delay = 'Delay must be at least 3 seconds.';
+    if (settings.batchSize < 5) errors.batchSize = 'Batch size must be at least 5.';
+    if (Object.keys(errors).length > 0) { setValidationErrors(errors); return; }
+    setValidationErrors({});
     await sendToBackground('SAVE_SETTINGS', settings as unknown as Record<string, unknown>);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
-  function field(label: string, node: React.ReactNode) {
+  function field(label: string, node: React.ReactNode, error?: string) {
     return (
       <div style={{ marginBottom: '16px' }}>
         <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px' }}>{label}</label>
         {node}
+        {error && <div style={{ color: '#c5221f', fontSize: '12px', marginTop: '3px' }}>⚠️ {error}</div>}
       </div>
     );
   }
@@ -51,8 +56,8 @@ export default function Options() {
       {settings.delayPreset === 'custom' && field('Custom Delay (seconds, min 3)', (
         <input type="number" min={3} max={60} value={settings.customDelaySeconds}
           onChange={(e) => setSettings({ ...settings, customDelaySeconds: Number(e.target.value) })}
-          style={{ width: '100%', padding: '6px' }} />
-      ))}
+          style={{ width: '100%', padding: '6px', borderColor: validationErrors.delay ? '#c5221f' : undefined }} />
+      ), validationErrors.delay)}
 
       {field('Random Jitter', (
         <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -64,8 +69,8 @@ export default function Options() {
       {field('Batch Size (messages per batch, min 5)', (
         <input type="number" min={5} max={100} value={settings.batchSize}
           onChange={(e) => setSettings({ ...settings, batchSize: Number(e.target.value) })}
-          style={{ width: '100%', padding: '6px' }} />
-      ))}
+          style={{ width: '100%', padding: '6px', borderColor: validationErrors.batchSize ? '#c5221f' : undefined }} />
+      ), validationErrors.batchSize)}
 
       {field('Batch Cool-down (seconds)', (
         <input type="number" min={10} max={600} value={settings.cooldownSeconds}

@@ -50,11 +50,11 @@ export async function saveSettings(settings: ExtensionSettings): Promise<void> {
 
 export async function getDailyCount(): Promise<{ sent: number; limit: number }> {
   return new Promise((resolve) => {
-    chrome.storage.local.get([DAILY_KEY, DAILY_DATE_KEY, 'extensionSettings'], (result) => {
+    chrome.storage.local.get([DAILY_KEY, DAILY_DATE_KEY, SETTINGS_KEY], (result) => {
       const today = new Date().toDateString();
       const storedDate = result[DAILY_DATE_KEY] as string | undefined;
       const sent = storedDate === today ? ((result[DAILY_KEY] as number) ?? 0) : 0;
-      const settings = (result['extensionSettings'] as ExtensionSettings) ?? DEFAULT_SETTINGS;
+      const settings = (result[SETTINGS_KEY] as ExtensionSettings) ?? DEFAULT_SETTINGS;
       resolve({ sent, limit: settings.dailyLimit });
     });
   });

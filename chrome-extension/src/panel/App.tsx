@@ -38,6 +38,7 @@ export default function App() {
   const [summary, setSummary] = useState<{ sent: number; failed: number; skipped: number } | null>(null);
   const [dailyCount, setDailyCount] = useState({ sent: 0, limit: 200 });
   const [csvWarning, setCsvWarning] = useState('');
+  const [errorBanner, setErrorBanner] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -105,7 +106,7 @@ export default function App() {
       setCsvWarning(c.length > 5000 ? `⚠️ ${c.length} contacts — approaching storage limit. Consider splitting the CSV.` : '');
       await saveContactsToStorage(c);
     } catch (err) {
-      alert('Failed to parse CSV: ' + String(err));
+      setErrorBanner('Failed to parse CSV: ' + String(err));
     }
   }, []);
 
@@ -123,8 +124,9 @@ export default function App() {
   const safePreview = DOMPurify.sanitize(resolvedPreview);
 
   function startJob() {
-    if (contacts.length === 0) { alert('Please upload a CSV first.'); return; }
-    if (mode === 'email' && !subject) { alert('Please enter a subject.'); return; }
+    if (contacts.length === 0) { setErrorBanner('Please upload a CSV first.'); return; }
+    if (mode === 'email' && !subject) { setErrorBanner('Please enter a subject line.'); return; }
+    setErrorBanner('');
     setStatus('sending');
     setLogs([]);
     setSummary(null);
@@ -160,6 +162,14 @@ export default function App() {
       <div style={{ background: '#f8f9fa', padding: '6px 16px', fontSize: '12px', borderBottom: '1px solid #e0e0e0' }}>
         📊 Today: <b>{dailyCount.sent}</b> / {dailyCount.limit} messages sent
       </div>
+
+      {/* Error banner */}
+      {errorBanner && (
+        <div style={{ background: '#fce8e6', color: '#c5221f', padding: '8px 16px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>⚠️ {errorBanner}</span>
+          <button onClick={() => setErrorBanner('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c5221f', fontWeight: 700 }}>✕</button>
+        </div>
+      )}
 
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
