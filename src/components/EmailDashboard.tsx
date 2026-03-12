@@ -99,6 +99,7 @@ export default function EmailDashboard() {
     const [waStatus, setWaStatus] = useState<WAStatus>('disconnected');
     const [waQR, setWaQR] = useState<string | null>(null);
     const [waConnecting, setWaConnecting] = useState(false);
+    const [waInitError, setWaInitError] = useState<string | null>(null);
     // Task 18 — mid-send disconnect / rate-limit state
     const [waReconnectPrompt, setWaReconnectPrompt] = useState(false);
     const [waEffectiveDelay, setWaEffectiveDelay] = useState<number | null>(null); // override when rate-limited
@@ -135,8 +136,9 @@ export default function EmailDashboard() {
             try {
                 const res = await fetch('/api/whatsapp/status');
                 if (res.ok) {
-                    const json = await res.json() as { status: WAStatus };
+                    const json = await res.json() as { status: WAStatus; error?: string };
                     setWaStatus(json.status);
+                    setWaInitError(json.error ?? null);
                 }
             } catch { /* ignore */ }
         };
@@ -447,6 +449,7 @@ export default function EmailDashboard() {
     // --- WhatsApp Connect / Disconnect (Phase 3, Task 14) ---
     const handleConnectWhatsApp = useCallback(async () => {
         setWaConnecting(true);
+        setWaInitError(null);
         try {
             await fetch('/api/whatsapp/init', { method: 'POST' });
         } catch { /* ignore */ } finally {
@@ -750,18 +753,25 @@ export default function EmailDashboard() {
                     </div>
 
                     {waStatus === 'disconnected' && (
-                        <button
-                            onClick={handleConnectWhatsApp}
-                            disabled={waConnecting}
-                            className="btn-primary"
-                            style={{ marginTop: 12 }}
-                        >
-                            {waConnecting
-                                ? <RefreshCw className="w-4 h-4 animate-spin" />
-                                : <MessageCircle className="w-4 h-4" />
-                            }
-                            {waConnecting ? 'Connecting…' : 'Connect WhatsApp'}
-                        </button>
+                        <>
+                            <button
+                                onClick={handleConnectWhatsApp}
+                                disabled={waConnecting}
+                                className="btn-primary"
+                                style={{ marginTop: 12 }}
+                            >
+                                {waConnecting
+                                    ? <RefreshCw className="w-4 h-4 animate-spin" />
+                                    : <MessageCircle className="w-4 h-4" />
+                                }
+                                {waConnecting ? 'Connecting…' : 'Connect WhatsApp'}
+                            </button>
+                            {waInitError && (
+                                <p style={{ fontSize: 12, color: 'var(--red)', marginTop: 8, wordBreak: 'break-word' }}>
+                                    ⚠️ {waInitError}
+                                </p>
+                            )}
+                        </>
                     )}
 
                     {waStatus === 'reconnecting' && (

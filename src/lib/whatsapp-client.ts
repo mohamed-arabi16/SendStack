@@ -14,6 +14,8 @@ interface WAClientState {
   info: { pushname?: string; wid?: string } | null;
   /** messageId → latest ACK level */
   ackMap: Map<string, AckStatus>;
+  /** Last initialization error message, if any */
+  lastError: string | null;
 }
 
 // Use globalThis to survive Next.js hot-reloads in development
@@ -30,6 +32,7 @@ function getState(): WAClientState {
       qrString: null,
       info: null,
       ackMap: new Map(),
+      lastError: null,
     };
   }
   return globalThis.__waClientState;
@@ -47,6 +50,11 @@ export function getClientInfo(): { pushname?: string; wid?: string } | null {
   return getState().info;
 }
 
+/** Returns the last initialization error message, or null if there was no error. */
+export function getError(): string | null {
+  return getState().lastError;
+}
+
 /** Returns the latest ACK level for a given message ID, or null if not tracked. */
 export function getAckStatus(messageId: string): AckStatus | null {
   return getState().ackMap.get(messageId) ?? null;
@@ -61,7 +69,8 @@ export function getAllAcks(): Record<string, AckStatus> {
 }
 
 const AUTH_PATH = '.wwebjs_auth';
-const SESSION_DIR = path.join(AUTH_PATH, 'session-default');
+// LocalAuth without a clientId stores the session at `{dataPath}/session`
+const SESSION_DIR = path.join(AUTH_PATH, 'session');
 
 /** Check whether a persisted LocalAuth session exists on disk. */
 export function isSessionSaved(): boolean {
@@ -87,6 +96,27 @@ export function clearSavedSession(): void {
 }
 
 /**
+ * Remove stale Puppeteer singleton lock/socket files left behind by a
+ * previous browser instance that was killed without a clean shutdown.
+ * Without this cleanup, Puppeteer refuses to launch with
+ * "The browser is already running for <path>".
+ */
+function clearPuppeteerLocks(userDataDir: string): void {
+  const lockFiles = ['SingletonLock', 'SingletonSocket', 'SingletonCookie'];
+  for (const name of lockFiles) {
+    const filePath = path.join(userDataDir, name);
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.rmSync(filePath, { force: true });
+        console.log(`[WhatsApp] Removed stale lock file: ${filePath}`);
+      }
+    } catch (err) {
+      console.warn(`[WhatsApp] Could not remove lock file ${filePath}:`, err);
+    }
+  }
+}
+
+/**
  * Auto-initialise the client when a saved session exists and the client
  * is currently disconnected.  This is called by the status endpoint so
  * that a page reload after a server restart reconnects automatically.
@@ -95,9 +125,11 @@ export function autoInit(): void {
   const state = getState();
   if (state.status === 'disconnected' && isSessionSaved()) {
     state.status = 'reconnecting';
+    state.lastError = null;
     initialize().catch((err: Error) => {
       console.error('[WhatsApp] Auto-reconnect failed:', err);
       state.status = 'disconnected';
+      state.lastError = err.message;
     });
   }
 }
@@ -110,10 +142,18 @@ export async function initialize(): Promise<void> {
     return;
   }
 
+  // Clear any previous error
+  state.lastError = null;
+
   // If a saved session exists, show 'reconnecting' so the UI can give appropriate feedback
   if (state.status === 'disconnected' && isSessionSaved()) {
     state.status = 'reconnecting';
   }
+
+  // Clean up stale Puppeteer singleton lock files left over from a previous
+  // browser instance that was killed without a clean shutdown.  Without this,
+  // Puppeteer refuses to launch with "The browser is already running for <path>".
+  clearPuppeteerLocks(SESSION_DIR);
 
   const client = new Client({
     authStrategy: new LocalAuth({ dataPath: AUTH_PATH }),
@@ -160,6 +200,7 @@ export async function initialize(): Promise<void> {
     console.error('[WhatsApp] Auth failure:', msg);
     // Always reset state first so the client is usable again regardless of session-clear outcome
     state.status = 'disconnected';
+    state.lastError = msg;
     state.qrString = null;
     state.client = null;
     // Clear saved session so next connect starts a fresh QR flow
@@ -179,7 +220,16 @@ export async function initialize(): Promise<void> {
     console.log(`[WhatsApp] Message ACK — id=${msg.id.id} ack=${ack}`);
   });
 
-  await client.initialize();
+  try {
+    await client.initialize();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WhatsApp] client.initialize() failed:', message);
+    state.status = 'disconnected';
+    state.lastError = message;
+    state.client = null;
+    throw err;
+  }
 }
 
 /** Validate and normalize a phone number. Returns normalized digits or throws. */
