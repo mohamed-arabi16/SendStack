@@ -35,3 +35,7 @@ next-env.d.ts
 # whatsapp-web.js session data
 .wwebjs_auth/
 .wwebjs_cache/
+
+# Chrome extension build artifacts
+chrome-extension/node_modules/
+chrome-extension/dist/
