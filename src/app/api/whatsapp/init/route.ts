@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStatus, initialize } from '@/lib/whatsapp-client';
+import { getStatus, getError, initialize } from '@/lib/whatsapp-client';
 
 export async function POST() {
   try {
@@ -26,4 +26,8 @@ export async function POST() {
       { status: 500 }
     );
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ status: getStatus(), error: getError() });
 }

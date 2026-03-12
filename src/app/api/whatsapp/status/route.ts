@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStatus, getClientInfo, autoInit } from '@/lib/whatsapp-client';
+import { getStatus, getClientInfo, getError, autoInit } from '@/lib/whatsapp-client';
 
 export async function GET() {
   try {
@@ -9,10 +9,12 @@ export async function GET() {
 
     const status = getStatus();
     const info = getClientInfo();
+    const error = getError();
 
     return NextResponse.json({
       status,
       ...(info ? { phone: info.wid, name: info.pushname } : {}),
+      ...(error ? { error } : {}),
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
