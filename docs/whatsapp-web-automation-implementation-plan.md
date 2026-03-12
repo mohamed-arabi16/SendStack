@@ -340,7 +340,7 @@
 
 ### Task 17: Implement Session Persistence with `LocalAuth`
 
-- [ ] **Ensure WhatsApp session survives server restarts**
+- [x] **Ensure WhatsApp session survives server restarts**
 
   - Verify `LocalAuth` strategy is saving session data to `.wwebjs_auth/`.
   - On server start / client initialisation, check for an existing saved session.
@@ -358,7 +358,7 @@
 
 ### Task 18: Implement Robust Error Handling
 
-- [ ] **Add comprehensive error handling for all WhatsApp operations**
+- [x] **Add comprehensive error handling for all WhatsApp operations**
 
   Cover these scenarios:
   1. **Client disconnects mid-send** — Detect disconnect, pause sending, show reconnect prompt.
@@ -382,7 +382,7 @@
 
 ### Task 19: Add Media Sending Support
 
-- [ ] **Enable sending images and documents alongside text messages**
+- [x] **Enable sending images and documents alongside text messages**
 
   - Use `whatsapp-web.js`'s `MessageMedia` class to attach files.
   - Add an "Attach Media" button in the WhatsApp mode panel.
@@ -401,7 +401,7 @@
 
 ### Task 20: Add Message Delivery Status Tracking
 
-- [ ] **Track and display delivery status for each sent message**
+- [x] **Track and display delivery status for each sent message**
 
   Use `whatsapp-web.js`'s `message_ack` event to track:
 
@@ -425,7 +425,7 @@
 
 ### Task 21: Add Scheduled / Timed Sending
 
-- [ ] **Allow users to schedule a bulk send for a specific time**
+- [x] **Allow users to schedule a bulk send for a specific time**
 
   - Add a "Schedule" option alongside the "Send Now" button.
   - Use a date-time picker to select the send time.
