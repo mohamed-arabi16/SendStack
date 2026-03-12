@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { Client, LocalAuth, MessageMedia, type Message } from 'whatsapp-web.js';
 
@@ -68,7 +69,9 @@ export function getAllAcks(): Record<string, AckStatus> {
   return Object.fromEntries(getState().ackMap.entries());
 }
 
-const AUTH_PATH = '.wwebjs_auth';
+// Use os.tmpdir() so this path is always writable — both in local dev and in
+// serverless/Lambda environments where the project root (/var/task) is read-only.
+const AUTH_PATH = path.join(os.tmpdir(), '.wwebjs_auth');
 // LocalAuth without a clientId stores the session at `{dataPath}/session`
 const SESSION_DIR = path.join(AUTH_PATH, 'session');
 
@@ -148,6 +151,15 @@ export async function initialize(): Promise<void> {
   // If a saved session exists, show 'reconnecting' so the UI can give appropriate feedback
   if (state.status === 'disconnected' && isSessionSaved()) {
     state.status = 'reconnecting';
+  }
+
+  // Ensure the auth directory exists before LocalAuth tries to create sub-directories.
+  // This is essential in serverless environments (e.g. Vercel/Lambda) where only
+  // os.tmpdir() (/tmp) is writable — the directory may not exist yet on a cold start.
+  try {
+    fs.mkdirSync(AUTH_PATH, { recursive: true });
+  } catch (err) {
+    console.warn('[WhatsApp] Could not pre-create auth directory:', err);
   }
 
   // Clean up stale Puppeteer singleton lock files left over from a previous
