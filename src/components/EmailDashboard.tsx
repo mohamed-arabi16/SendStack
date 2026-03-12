@@ -5,15 +5,54 @@ import Image from 'next/image';
 import Papa from 'papaparse';
 import {
     Upload, FileText, Send, Settings, CheckCircle, AlertCircle,
-    RefreshCw, Eye, ChevronLeft, ChevronRight, Clock, Zap, Mail, ArrowRight, MessageCircle, Phone
+    RefreshCw, Eye, ChevronLeft, ChevronRight, Clock, Zap, Mail, ArrowRight, MessageCircle, Phone,
+    Paperclip, Calendar, X
 } from 'lucide-react';
 import { resolveSpin, applyJitter } from '@/lib/whatsapp-utils';
 
 type CSVRow = Record<string, string>;
-type LogEntry = { email: string; status: 'success' | 'error' | 'info'; message?: string; errorType?: string };
+type LogEntry = {
+    email: string;
+    status: 'success' | 'error' | 'info';
+    message?: string;
+    errorType?: string;
+    /** WhatsApp message ID — used to track ACK status */
+    messageId?: string;
+};
+type WAStatus = 'disconnected' | 'reconnecting' | 'qr' | 'ready';
+/** ACK level: 0=Pending 1=Sent 2=Delivered 3=Read */
+type AckLevel = 0 | 1 | 2 | 3;
 
 /** Milliseconds for each WhatsApp delay preset */
 const WA_DELAY_PRESETS = { fast: 5000, normal: 10000, safe: 15000 } as const;
+
+/** Max seconds to wait for WhatsApp reconnection during a mid-send disconnect */
+const MAX_RECONNECT_WAIT_SECONDS = 120;
+
+/** Maximum additional delay imposed when rate-limiting is detected (ms) */
+const MAX_RATE_LIMIT_PENALTY_MS = 60000;
+
+/** Delay increment per rate-limit hit (ms) */
+const RATE_LIMIT_INCREMENT_MS = 10000;
+
+/** Allowed MIME types for media attachment */
+const ALLOWED_MEDIA_TYPES: Record<string, string> = {
+    'image/png': 'PNG', 'image/jpeg': 'JPG', 'image/gif': 'GIF', 'image/webp': 'WebP',
+    'application/pdf': 'PDF',
+    'application/msword': 'DOC',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+    'application/vnd.ms-excel': 'XLS',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+};
+const MAX_MEDIA_BYTES = 16 * 1024 * 1024; // 16 MB
+
+/** Human-readable ACK icon + label */
+const ACK_DISPLAY: Record<AckLevel, { icon: string; label: string; color: string }> = {
+    0: { icon: '⏳', label: 'Pending', color: 'var(--text-tertiary)' },
+    1: { icon: '✓', label: 'Sent', color: 'var(--text-secondary)' },
+    2: { icon: '✓✓', label: 'Delivered', color: 'var(--text-secondary)' },
+    3: { icon: '✓✓', label: 'Read', color: '#4ade80' },
+};
 
 export default function EmailDashboard() {
     const [step, setStep] = useState(1);
@@ -57,9 +96,22 @@ export default function EmailDashboard() {
     const [waValidating, setWaValidating] = useState(false);
     const [waDailyCount, setWaDailyCount] = useState(0);
     const [waLimitOverridden, setWaLimitOverridden] = useState(false);
-    const [waStatus, setWaStatus] = useState<'disconnected' | 'qr' | 'ready'>('disconnected');
+    const [waStatus, setWaStatus] = useState<WAStatus>('disconnected');
     const [waQR, setWaQR] = useState<string | null>(null);
     const [waConnecting, setWaConnecting] = useState(false);
+    // Task 18 — mid-send disconnect / rate-limit state
+    const [waReconnectPrompt, setWaReconnectPrompt] = useState(false);
+    const [waEffectiveDelay, setWaEffectiveDelay] = useState<number | null>(null); // override when rate-limited
+    // Task 19 — Media attachment
+    const [waMediaFile, setWaMediaFile] = useState<File | null>(null);
+    const [waMediaBase64, setWaMediaBase64] = useState<string | null>(null);
+    const waMediaInputRef = useRef<HTMLInputElement>(null);
+    // Task 20 — ACK status tracking
+    const [waAckMap, setWaAckMap] = useState<Record<string, AckLevel>>({});
+    // Task 21 — Scheduled sending
+    const [waScheduleEnabled, setWaScheduleEnabled] = useState(false);
+    const [waScheduledTime, setWaScheduledTime] = useState('');
+    const [waScheduleCountdown, setWaScheduleCountdown] = useState<string | null>(null);
 
     // Load/sync daily WhatsApp send count from localStorage
     useEffect(() => {
@@ -83,7 +135,7 @@ export default function EmailDashboard() {
             try {
                 const res = await fetch('/api/whatsapp/status');
                 if (res.ok) {
-                    const json = await res.json() as { status: 'disconnected' | 'qr' | 'ready' };
+                    const json = await res.json() as { status: WAStatus };
                     setWaStatus(json.status);
                 }
             } catch { /* ignore */ }
@@ -112,6 +164,50 @@ export default function EmailDashboard() {
         const id = setInterval(fetchQR, 3000);
         return () => clearInterval(id);
     }, [mode, waStatus]);
+
+    // Task 20 — Poll ACK status while a send is in progress
+    useEffect(() => {
+        if (sendingStatus !== 'sending' || mode !== 'whatsapp') return;
+        const poll = async () => {
+            try {
+                const res = await fetch('/api/whatsapp/ack');
+                if (res.ok) {
+                    const json = await res.json() as { acks: Record<string, AckLevel> };
+                    setWaAckMap(prev => ({ ...prev, ...json.acks }));
+                }
+            } catch { /* ignore */ }
+        };
+        const id = setInterval(poll, 5000);
+        return () => clearInterval(id);
+    }, [sendingStatus, mode]);
+
+    // Task 21 — Countdown timer for scheduled send
+    useEffect(() => {
+        if (!waScheduleEnabled || !waScheduledTime) {
+            setWaScheduleCountdown(null);
+            return;
+        }
+        const tick = () => {
+            const diff = new Date(waScheduledTime).getTime() - Date.now();
+            if (diff <= 0) {
+                setWaScheduleCountdown('Now');
+                return;
+            }
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            setWaScheduleCountdown(
+                h > 0
+                    ? `${h}h ${m}m ${s}s`
+                    : m > 0
+                    ? `${m}m ${s}s`
+                    : `${s}s`,
+            );
+        };
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+    }, [waScheduleEnabled, waScheduledTime]);
 
     // --- CSV Parsing ---
     const parseCSV = useCallback((uploadedFile: File) => {
@@ -184,6 +280,42 @@ export default function EmailDashboard() {
             } catch { /* ignore */ }
             return next;
         });
+    }, []);
+
+    // Task 19 — handle media file selection
+    const handleMediaFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        if (!ALLOWED_MEDIA_TYPES[f.type]) {
+            alert(`Unsupported file type. Allowed: ${Object.values(ALLOWED_MEDIA_TYPES).join(', ')}`);
+            return;
+        }
+        if (f.size > MAX_MEDIA_BYTES) {
+            alert('File too large. Maximum size is 16 MB.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = reader.result as string;
+            // result is "data:<mime>;base64,<data>" — extract only the base64 part
+            const base64 = result.split(',')[1];
+            setWaMediaFile(f);
+            setWaMediaBase64(base64);
+        };
+        reader.readAsDataURL(f);
+    }, []);
+
+    const handleClearMedia = useCallback(() => {
+        setWaMediaFile(null);
+        setWaMediaBase64(null);
+        if (waMediaInputRef.current) waMediaInputRef.current.value = '';
+    }, []);
+
+    // Task 21 — return min datetime string for the schedule picker (current time + 1 min)
+    const scheduleMinTime = useMemo(() => {
+        const d = new Date(Date.now() + 60000);
+        d.setSeconds(0, 0);
+        return d.toISOString().slice(0, 16);
     }, []);
 
     // Detect variables used in template
@@ -334,6 +466,16 @@ export default function EmailDashboard() {
 
     // --- Send WhatsApp ---
     const handleSendWhatsApp = async () => {
+        // Task 21 — If scheduled, wait until the target time
+        if (waScheduleEnabled && waScheduledTime) {
+            const target = new Date(waScheduledTime).getTime();
+            const now = Date.now();
+            if (target > now) {
+                // Wait until scheduled time
+                await new Promise(r => setTimeout(r, target - now));
+            }
+        }
+
         // Check daily limit (Task 12)
         const dailyRemaining = waDailyLimit - waDailyCount;
         if (!waLimitOverridden && dailyRemaining <= 0) {
@@ -344,9 +486,40 @@ export default function EmailDashboard() {
         setSendingStatus('sending');
         setLogs([]);
         setCurrentProgress(0);
+        setWaReconnectPrompt(false);
+        setWaEffectiveDelay(null);
         let sentCount = 0;
+        // Track rate-limit hits to progressively increase delay
+        let rateLimitHits = 0;
 
         for (let i = 0; i < data.length; i++) {
+            // Task 18 — Pause if client disconnected mid-send
+            if (waStatus !== 'ready') {
+                setWaReconnectPrompt(true);
+                setLogs(prev => [...prev, { email: '⚠️', status: 'info', message: 'WhatsApp disconnected mid-send. Reconnect and the batch will resume…' }]);
+                // Wait up to 2 minutes for reconnection
+                let waited = 0;
+                let reconnected = false;
+                while (waited < MAX_RECONNECT_WAIT_SECONDS) {
+                    await new Promise(r => setTimeout(r, 3000));
+                    waited += 3;
+                    const res = await fetch('/api/whatsapp/status').catch(() => null);
+                    if (res?.ok) {
+                        const json = await res.json() as { status: WAStatus };
+                        setWaStatus(json.status);
+                        if (json.status === 'ready') {
+                            setWaReconnectPrompt(false);
+                            reconnected = true;
+                            break;
+                        }
+                    }
+                }
+                if (!reconnected) {
+                    setLogs(prev => [...prev, { email: '🛑', status: 'error', message: 'Could not reconnect — send aborted.' }]);
+                    break;
+                }
+            }
+
             const row = data[i];
             const rawPhone = row[mapping.phone];
             const name = mapping.name ? row[mapping.name] : 'Recipient';
@@ -358,6 +531,13 @@ export default function EmailDashboard() {
             }
 
             const phone = rawPhone.replace(/[\s\-\(\)\+]/g, '');
+
+            // Task 18 — Phone number format validation
+            if (!/^\d{7,15}$/.test(phone)) {
+                setLogs(prev => [...prev, { email: `${name} (${rawPhone})`, status: 'error', message: 'Invalid phone number format — skipped', errorType: 'invalid_phone' }]);
+                setCurrentProgress(((i + 1) / data.length) * 100);
+                continue;
+            }
 
             // Skip numbers marked invalid by pre-send validation (Task 13)
             if (waValidationResults.length > 0) {
@@ -383,25 +563,67 @@ export default function EmailDashboard() {
             }
 
             try {
-                const res = await fetch('/api/whatsapp/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, message }),
-                });
-                const result = await res.json() as { success: boolean; messageId?: string; error?: string };
+                let messageId: string | undefined;
 
-                if (result.success) {
-                    sentCount++;
-                    setLogs(prev => [...prev, {
-                        email: `${name} (${phone})`,
-                        status: 'success',
-                        message: `Sent — "${message.slice(0, 60)}${message.length > 60 ? '…' : ''}"`,
-                    }]);
+                // Task 19 — Send media if attached, otherwise send text
+                if (waMediaBase64 && waMediaFile) {
+                    const res = await fetch('/api/whatsapp/send-media', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            phone,
+                            mediaBase64: waMediaBase64,
+                            mimeType: waMediaFile.type,
+                            filename: waMediaFile.name,
+                            caption: message,
+                        }),
+                    });
+                    const result = await res.json() as { success: boolean; messageId?: string; error?: string; errorType?: string };
+                    if (!result.success) throw Object.assign(new Error(result.error ?? 'Send failed'), { errorType: result.errorType });
+                    messageId = result.messageId;
                 } else {
-                    setLogs(prev => [...prev, { email: `${name} (${phone})`, status: 'error', message: result.error }]);
+                    const res = await fetch('/api/whatsapp/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone, message }),
+                    });
+                    const result = await res.json() as { success: boolean; messageId?: string; error?: string; errorType?: string };
+                    if (!result.success) throw Object.assign(new Error(result.error ?? 'Send failed'), { errorType: result.errorType });
+                    messageId = result.messageId;
                 }
-            } catch {
-                setLogs(prev => [...prev, { email: `${name} (${phone})`, status: 'error', message: 'Network error — check your connection' }]);
+
+                sentCount++;
+                // Task 20 — seed the ACK map with pending status
+                if (messageId) {
+                    const id = messageId;
+                    setWaAckMap(prev => ({ ...prev, [id]: 0 }));
+                }
+                setLogs(prev => [...prev, {
+                    email: `${name} (${phone})`,
+                    status: 'success',
+                    message: `Sent — "${message.slice(0, 60)}${message.length > 60 ? '…' : ''}"`,
+                    messageId,
+                }]);
+
+                // Reset rate-limit counter on success
+                if (rateLimitHits > 0) rateLimitHits = 0;
+
+            } catch (err: unknown) {
+                const errMessage = err instanceof Error ? err.message : 'Unknown error';
+                const errType = (err as { errorType?: string }).errorType;
+
+                // Task 18 — Handle specific error types
+                if (errType === 'disconnected') {
+                    setWaReconnectPrompt(true);
+                }
+                if (errType === 'rate_limited') {
+                    rateLimitHits++;
+                    const penalty = Math.min(MAX_RATE_LIMIT_PENALTY_MS, getWABaseDelay() + rateLimitHits * RATE_LIMIT_INCREMENT_MS);
+                    setWaEffectiveDelay(penalty);
+                    setLogs(prev => [...prev, { email: '⚡', status: 'info', message: `Rate limit detected — increasing delay to ${(penalty / 1000).toFixed(0)}s` }]);
+                }
+
+                setLogs(prev => [...prev, { email: `${name} (${phone})`, status: 'error', message: errMessage, errorType: errType }]);
             }
 
             setCurrentProgress(((i + 1) / data.length) * 100);
@@ -421,7 +643,8 @@ export default function EmailDashboard() {
                     setWaCoolDownActive(false);
                 } else {
                     // Regular delay with optional jitter (Tasks 8 & 9)
-                    const baseMs = getWABaseDelay();
+                    // Use overridden delay when rate-limited (Task 18)
+                    const baseMs = waEffectiveDelay ?? getWABaseDelay();
                     const actualMs = waJitter ? applyJitter(baseMs) : baseMs;
                     const actualSec = (actualMs / 1000).toFixed(1);
                     setLogs(prev => [...prev, { email: '⏳', status: 'info', message: `Waiting ${actualSec}s before next message…` }]);
@@ -514,6 +737,11 @@ export default function EmailDashboard() {
                                 📱 Scan QR Code
                             </span>
                         )}
+                        {waStatus === 'reconnecting' && (
+                            <span style={{ background: 'var(--amber-bg)', color: 'var(--amber)', border: '1px solid var(--amber)', borderRadius: 'var(--radius-sm)', padding: '3px 12px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <RefreshCw className="w-3 h-3 animate-spin" /> Reconnecting…
+                            </span>
+                        )}
                         {waStatus === 'disconnected' && (
                             <span style={{ background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red)', borderRadius: 'var(--radius-sm)', padding: '3px 12px', fontSize: 13 }}>
                                 ⚫ Disconnected
@@ -534,6 +762,12 @@ export default function EmailDashboard() {
                             }
                             {waConnecting ? 'Connecting…' : 'Connect WhatsApp'}
                         </button>
+                    )}
+
+                    {waStatus === 'reconnecting' && (
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>
+                            A saved session was found — reconnecting automatically. This may take up to 30 seconds.
+                        </p>
                     )}
 
                     {waStatus === 'qr' && (
@@ -1057,6 +1291,39 @@ export default function EmailDashboard() {
                                     Message spin syntax <code>{'{Hi|Hello|Hey}'}</code>
                                 </label>
                             </div>
+
+                            {/* Task 19 — Media attachment */}
+                            <div className="field-group" style={{ marginTop: 8 }}>
+                                <label className="field-label">
+                                    <Paperclip className="w-4 h-4" style={{ display: 'inline', marginRight: 4 }} />
+                                    Attach Media (optional — sent with every message)
+                                </label>
+                                {waMediaFile ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, background: 'var(--green-bg)', border: '1px solid var(--green)', borderRadius: 'var(--radius-sm)', padding: '6px 12px' }}>
+                                        <Paperclip className="w-4 h-4" style={{ color: 'var(--green)' }} />
+                                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{waMediaFile.name} ({(waMediaFile.size / 1024).toFixed(0)} KB)</span>
+                                        <button onClick={handleClearMedia} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                                            <X className="w-4 h-4" style={{ color: 'var(--red)' }} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => waMediaInputRef.current?.click()}
+                                        className="btn-secondary"
+                                        style={{ width: '100%' }}
+                                    >
+                                        <Paperclip className="w-4 h-4" /> Attach Image or Document
+                                    </button>
+                                )}
+                                <input
+                                    ref={waMediaInputRef}
+                                    type="file"
+                                    accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx"
+                                    onChange={handleMediaFileChange}
+                                    className="hidden"
+                                />
+                                <p className="field-hint">PNG, JPG, GIF, WebP, PDF, DOCX, XLSX · Max 16 MB</p>
+                            </div>
                         </div>
                     )}
 
@@ -1093,9 +1360,14 @@ export default function EmailDashboard() {
                             {/* WhatsApp connection status warning (Phase 3, Task 14) */}
                             {mode === 'whatsapp' && waStatus !== 'ready' && (
                                 <div className="help-box" style={{ textAlign: 'left', marginBottom: 12 }}>
-                                    <p className="help-title">⚠️ WhatsApp Not Connected</p>
+                                    <p className="help-title">
+                                        {waStatus === 'reconnecting' ? '🔄 Reconnecting to WhatsApp…' : '⚠️ WhatsApp Not Connected'}
+                                    </p>
                                     <p style={{ fontSize: 13, marginTop: 4 }}>
-                                        Status: <strong>{waStatus}</strong>. Use the <strong>WhatsApp Connection</strong> panel above to scan a QR code and authenticate before sending.
+                                        {waStatus === 'reconnecting'
+                                            ? 'A saved session was found and is being restored. Please wait a moment before sending.'
+                                            : <>Status: <strong>{waStatus}</strong>. Use the <strong>WhatsApp Connection</strong> panel above to scan a QR code and authenticate before sending.</>
+                                        }
                                     </p>
                                 </div>
                             )}
@@ -1190,8 +1462,51 @@ export default function EmailDashboard() {
                                 className="btn-send"
                             >
                                 {mode === 'email' ? <Send className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
-                                {mode === 'email' ? 'Start Sending' : 'Start Messaging'}
+                                {mode === 'email' ? 'Start Sending' : (waScheduleEnabled && waScheduledTime ? `Send at Scheduled Time` : 'Start Messaging')}
                             </button>
+
+                            {/* Task 21 — Schedule UI */}
+                            {mode === 'whatsapp' && (
+                                <div style={{ width: '100%', marginTop: 8 }}>
+                                    <label className="checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={waScheduleEnabled}
+                                            onChange={e => setWaScheduleEnabled(e.target.checked)}
+                                            className="checkbox-input"
+                                        />
+                                        <Calendar className="w-4 h-4" style={{ marginLeft: 4, marginRight: 2 }} />
+                                        Schedule for later
+                                    </label>
+                                    {waScheduleEnabled && (
+                                        <div style={{ marginTop: 8 }}>
+                                            <input
+                                                type="datetime-local"
+                                                min={scheduleMinTime}
+                                                value={waScheduledTime}
+                                                onChange={e => setWaScheduledTime(e.target.value)}
+                                                className="field-input"
+                                                style={{ fontSize: 13 }}
+                                            />
+                                            {waScheduledTime && (
+                                                <div style={{ marginTop: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <Clock className="w-4 h-4" />
+                                                    {waScheduleCountdown === 'Now'
+                                                        ? <span style={{ color: 'var(--green)' }}>Sending now…</span>
+                                                        : <span>Sends in <strong>{waScheduleCountdown}</strong></span>
+                                                    }
+                                                    <button
+                                                        onClick={() => { setWaScheduleEnabled(false); setWaScheduledTime(''); }}
+                                                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, textDecoration: 'underline', color: 'var(--red)' }}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <button onClick={() => setStep(3)} className="btn-back">
                                 ← Go back and edit
@@ -1203,7 +1518,11 @@ export default function EmailDashboard() {
                         <div className="results-section">
                             <h3 className="results-title">
                                 {sendingStatus === 'sending'
-                                    ? (waCoolDownActive ? `⏸ Cool-Down — resuming in ${waCoolDownRemaining}s…` : 'Sending in progress…')
+                                    ? (waReconnectPrompt
+                                        ? '⚠️ Reconnecting — waiting for WhatsApp…'
+                                        : waCoolDownActive
+                                        ? `⏸ Cool-Down — resuming in ${waCoolDownRemaining}s…`
+                                        : 'Sending in progress…')
                                     : 'Sending Complete'}
                             </h3>
 
@@ -1238,18 +1557,28 @@ export default function EmailDashboard() {
 
                             {/* Logs */}
                             <div className="logs-container">
-                                {logs.map((log, i) => (
-                                    <div key={i} className={`log-entry ${log.status}`}>
-                                        {log.status === 'success'
-                                            ? <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                                            : log.status === 'info'
-                                            ? <Clock className="w-4 h-4 flex-shrink-0" />
-                                            : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
-                                        <span className="log-email">{log.email}</span>
-                                        {log.message && <span className="log-message">— {log.message}</span>}
-                                    </div>
-                                ))}
-                                {sendingStatus === 'sending' && !waCoolDownActive && (
+                                {logs.map((log, i) => {
+                                    // Task 20 — Show ACK status for WhatsApp messages
+                                    const ack = log.messageId ? waAckMap[log.messageId] : undefined;
+                                    const ackDisplay = ack !== undefined ? ACK_DISPLAY[ack] : null;
+                                    return (
+                                        <div key={i} className={`log-entry ${log.status}`}>
+                                            {log.status === 'success'
+                                                ? <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                                                : log.status === 'info'
+                                                ? <Clock className="w-4 h-4 flex-shrink-0" />
+                                                : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+                                            <span className="log-email">{log.email}</span>
+                                            {log.message && <span className="log-message">— {log.message}</span>}
+                                            {ackDisplay && (
+                                                <span style={{ marginLeft: 'auto', fontSize: 12, color: ackDisplay.color, flexShrink: 0, fontWeight: 500 }} title={ackDisplay.label}>
+                                                    {ackDisplay.icon}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                                {sendingStatus === 'sending' && !waCoolDownActive && !waReconnectPrompt && (
                                     <div className="log-entry sending">
                                         <RefreshCw className="w-4 h-4 animate-spin flex-shrink-0" />
                                         <span>{mode === 'email' ? 'Sending next email…' : 'Preparing next message…'}</span>
@@ -1258,20 +1587,37 @@ export default function EmailDashboard() {
                             </div>
 
                             {sendingStatus === 'completed' && (
-                                <button
-                                    onClick={() => {
-                                        setSendingStatus('idle');
-                                        setLogs([]);
-                                        setCurrentProgress(0);
-                                        setStep(1);
-                                        setFile(null);
-                                        setData([]);
-                                        setHeaders([]);
-                                    }}
-                                    className="btn-secondary start-over"
-                                >
-                                    <RefreshCw className="w-4 h-4" /> Start New Campaign
-                                </button>
+                                <>
+                                    {/* Task 20 — ACK summary */}
+                                    {mode === 'whatsapp' && Object.keys(waAckMap).length > 0 && (
+                                        <div style={{ fontSize: 13, marginBottom: 12, display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+                                            {([0, 1, 2, 3] as AckLevel[]).map(level => {
+                                                const count = Object.values(waAckMap).filter(a => a === level).length;
+                                                if (count === 0) return null;
+                                                const d = ACK_DISPLAY[level];
+                                                return (
+                                                    <span key={level} style={{ color: d.color, fontWeight: 500 }}>
+                                                        {d.icon} {d.label}: {count}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => {
+                                            setSendingStatus('idle');
+                                            setLogs([]);
+                                            setCurrentProgress(0);
+                                            setStep(1);
+                                            setFile(null);
+                                            setData([]);
+                                            setHeaders([]);
+                                        }}
+                                        className="btn-secondary start-over"
+                                    >
+                                        <RefreshCw className="w-4 h-4" /> Start New Campaign
+                                    </button>
+                                </>
                             )}
                         </div>
                     )}

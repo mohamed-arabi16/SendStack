@@ -9,7 +9,7 @@ export async function POST() {
       return NextResponse.json({ status: 'already_connected' });
     }
 
-    if (currentStatus === 'qr') {
+    if (currentStatus === 'qr' || currentStatus === 'reconnecting') {
       return NextResponse.json({ status: 'initializing' });
     }
 
