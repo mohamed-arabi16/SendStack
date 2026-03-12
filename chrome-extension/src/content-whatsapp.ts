@@ -2,10 +2,10 @@ import { resolveTemplate, resolveSpin, applyJitter, sleep } from './lib/csv-pars
 import type { Contact } from './lib/csv-parser';
 import { sendToBackground } from './lib/messaging';
 import type { ExtensionSettings } from './lib/storage';
+import type { WaJobState } from './background';
 
 let panelVisible = false;
 let shadowHost: HTMLDivElement | null = null;
-let cancelRequested = false;
 
 function waitForElement(selector: string, timeout = 15000): Promise<Element> {
   return new Promise((resolve, reject) => {
@@ -21,6 +21,13 @@ function waitForElement(selector: string, timeout = 15000): Promise<Element> {
 }
 
 async function injectPanel() {
+  // If we are on a /send?phone=... page, resume the active bulk job and skip panel setup.
+  if (window.location.search.includes('phone=')) {
+    await processCurrentContact();
+    return;
+  }
+
+  // ---- Normal main-page panel injection ----
   try {
     await waitForElement('#pane-side', 20000);
   } catch {
@@ -66,33 +73,99 @@ function togglePanel() {
   }
 }
 
-// ---- WhatsApp send automation ----
+// ---- Process the current contact on a /send?phone=... page ----
 
-async function sendViaWhatsAppWeb(phone: string, message: string): Promise<void> {
-  const normalizedPhone = phone.replace(/[\s\-+]/g, '');
+async function processCurrentContact(): Promise<void> {
+  const job = await sendToBackground<WaJobState | null>('GET_ACTIVE_WA_JOB');
+  if (!job || job.status !== 'running') return;
 
-  // Navigate to the chat
-  const chatUrl = `https://web.whatsapp.com/send?phone=${normalizedPhone}`;
-  window.location.href = chatUrl;
+  const contact = job.contacts[job.currentIndex];
+  if (!contact) return;
 
-  // Wait for message input to appear
+  const phone = contact.phone ?? '';
+  const total = job.contacts.length;
+  let sent = job.sent;
+  let failed = job.failed;
+
+  // Enforce daily limit
+  const { sent: dailySent, limit: dailyLimit } =
+    await sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT');
+  if (dailySent >= dailyLimit) {
+    window.postMessage({
+      type: 'BULK_SENDER_PROGRESS', current: job.currentIndex + 1, total,
+      sent, failed, status: 'skipped', recipient: phone, error: 'Daily limit reached',
+    }, '*');
+    await sendToBackground('CANCEL_WA_JOB', {});
+    window.postMessage({ type: 'BULK_SENDER_COMPLETE', sent, failed, skipped: total - job.currentIndex }, '*');
+    return;
+  }
+
+  let resolvedMsg = resolveTemplate(job.template, contact);
+  if (job.settings.spinSyntaxEnabled) resolvedMsg = resolveSpin(resolvedMsg);
+
+  try {
+    await doSendOnCurrentPage(phone, resolvedMsg);
+    sent++;
+    await sendToBackground('INCREMENT_COUNT', { n: 1 });
+    window.postMessage({
+      type: 'BULK_SENDER_PROGRESS', current: job.currentIndex + 1, total,
+      sent, failed, status: 'success', recipient: phone,
+    }, '*');
+  } catch (err) {
+    failed++;
+    window.postMessage({
+      type: 'BULK_SENDER_PROGRESS', current: job.currentIndex + 1, total,
+      sent, failed, status: 'error', recipient: phone, error: String(err),
+    }, '*');
+  }
+
+  // Advance job in background
+  const { nextIndex, status } =
+    await sendToBackground<{ nextIndex: number; status: WaJobState['status'] }>('ADVANCE_WA_JOB', { sent, failed });
+
+  if (status === 'completed' || status === 'cancelled') {
+    window.postMessage({ type: 'BULK_SENDER_COMPLETE', sent, failed, skipped: total - sent - failed }, '*');
+    return;
+  }
+
+  // Inter-message delay
+  const batchSize = job.settings.batchSize;
+  if (nextIndex % batchSize === 0) {
+    window.postMessage({ type: 'BULK_SENDER_COOLDOWN', seconds: job.settings.cooldownSeconds }, '*');
+    await sleep(job.settings.cooldownSeconds * 1000);
+  } else {
+    const delayMap: Record<string, number> = { fast: 5000, normal: 10000, safe: 15000 };
+    const base = job.settings.delayPreset === 'custom'
+      ? job.settings.customDelaySeconds * 1000
+      : (delayMap[job.settings.delayPreset] ?? 10000);
+    const delay = job.settings.jitterEnabled ? applyJitter(base) : base;
+    await sleep(delay);
+  }
+
+  // Navigate to next contact
+  const nextContact = job.contacts[nextIndex];
+  if (nextContact?.phone) {
+    const nextPhone = nextContact.phone.replace(/[\s\-+]/g, '');
+    window.location.href = `https://web.whatsapp.com/send?phone=${nextPhone}`;
+  }
+}
+
+// ---- WhatsApp send interaction on the current page ----
+
+async function doSendOnCurrentPage(phone: string, message: string): Promise<void> {
   const input = await waitForElement('footer [contenteditable="true"]', 20000) as HTMLElement;
 
-  // Check if the number is invalid (WhatsApp shows an error)
-  await sleep(3000);
+  await sleep(1000);
   const invalidMsg = document.querySelector('[data-testid="intro-text"]');
   if (invalidMsg?.textContent?.includes('Phone number shared via url is invalid')) {
     throw new Error(`Phone ${phone} is not on WhatsApp`);
   }
 
-  // Type the message
   input.focus();
   document.execCommand('insertText', false, message);
   input.dispatchEvent(new Event('input', { bubbles: true }));
+  await sleep(300);
 
-  await sleep(500);
-
-  // Press Enter or click send button
   const sendBtn = document.querySelector('[data-testid="send"], [aria-label="Send"]') as HTMLElement | null;
   if (sendBtn) {
     sendBtn.click();
@@ -100,69 +173,10 @@ async function sendViaWhatsAppWeb(phone: string, message: string): Promise<void>
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   }
 
-  await sleep(1000);
+  await sleep(500);
 }
 
-// ---- Bulk WhatsApp Job ----
-
-async function runWhatsAppJob(contacts: Contact[], template: string, settings: ExtensionSettings) {
-  cancelRequested = false;
-  const total = contacts.length;
-  let sent = 0, failed = 0;
-
-  const delayMap: Record<string, number> = { fast: 5000, normal: 10000, safe: 15000 };
-  const baseDelay = settings.delayPreset === 'custom'
-    ? settings.customDelaySeconds * 1000
-    : (delayMap[settings.delayPreset] ?? 10000);
-
-  for (let i = 0; i < contacts.length; i++) {
-    if (cancelRequested) break;
-
-    const contact = contacts[i];
-    const phone = contact.phone ?? '';
-    if (!phone) {
-      failed++;
-      postProgress(i + 1, total, sent, failed, 'skipped', phone, 'No phone number');
-      continue;
-    }
-
-    let resolvedMsg = resolveTemplate(template, contact);
-    if (settings.spinSyntaxEnabled) resolvedMsg = resolveSpin(resolvedMsg);
-
-    try {
-      await sendViaWhatsAppWeb(phone, resolvedMsg);
-      sent++;
-      await sendToBackground('INCREMENT_COUNT', { n: 1 });
-      postProgress(i + 1, total, sent, failed, 'success', phone);
-    } catch (err) {
-      failed++;
-      postProgress(i + 1, total, sent, failed, 'error', phone, String(err));
-    }
-
-    // Batch cool-down
-    if ((i + 1) % settings.batchSize === 0 && i + 1 < contacts.length) {
-      postCooldown(settings.cooldownSeconds);
-      await sleep(settings.cooldownSeconds * 1000);
-    } else {
-      const delay = settings.jitterEnabled ? applyJitter(baseDelay) : baseDelay;
-      await sleep(delay);
-    }
-  }
-
-  postJobComplete(sent, failed, total - sent - failed);
-}
-
-function postProgress(current: number, total: number, sent: number, failed: number, status: string, recipient: string, error?: string) {
-  window.postMessage({ type: 'BULK_SENDER_PROGRESS', current, total, sent, failed, status, recipient, error }, '*');
-}
-
-function postCooldown(seconds: number) {
-  window.postMessage({ type: 'BULK_SENDER_COOLDOWN', seconds }, '*');
-}
-
-function postJobComplete(sent: number, failed: number, skipped: number) {
-  window.postMessage({ type: 'BULK_SENDER_COMPLETE', sent, failed, skipped }, '*');
-}
+// ---- Panel message handler (main page only) ----
 
 function handlePanelMessage(event: MessageEvent) {
   const data = event.data as { type: string; [key: string]: unknown };
@@ -172,9 +186,24 @@ function handlePanelMessage(event: MessageEvent) {
     const { contacts, template, settings } = data as unknown as {
       contacts: Contact[]; template: string; settings: ExtensionSettings;
     };
-    runWhatsAppJob(contacts, template, settings).catch(console.error);
+    startWaJob(contacts, template, settings).catch(console.error);
   } else if (data.type === 'CANCEL_JOB') {
-    cancelRequested = true;
+    sendToBackground('CANCEL_WA_JOB', {}).catch(console.error);
+  }
+}
+
+async function startWaJob(contacts: Contact[], template: string, settings: ExtensionSettings): Promise<void> {
+  const jobId = `wa-${Date.now()}`;
+  const job: WaJobState = {
+    jobId, contacts, template, settings,
+    currentIndex: 0, sent: 0, failed: 0, status: 'running',
+  };
+  await sendToBackground('STORE_WA_JOB', job as unknown as Record<string, unknown>);
+
+  // Navigate to the first contact's send URL
+  const firstPhone = contacts[0]?.phone?.replace(/[\s\-+]/g, '') ?? '';
+  if (firstPhone) {
+    window.location.href = `https://web.whatsapp.com/send?phone=${firstPhone}`;
   }
 }
 

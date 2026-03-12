@@ -376,7 +376,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 12: Write End-to-End Tests for Core Flows
 
-- [ ] **Add Playwright tests that load the unpacked extension and exercise the main flows**
+- [x] **Add Playwright tests that load the unpacked extension and exercise the main flows**
 
   Test cases:
   1. **Gmail bulk send** — Upload a 3-row CSV, set a template, trigger send, verify 3 Gmail compose windows open and close in sequence.
@@ -398,7 +398,7 @@ A Chrome Extension version of the Bulk Email & WhatsApp Sender that runs entirel
 
 ### Task 13: Prepare Chrome Web Store Listing
 
-- [ ] **Create the Chrome Web Store submission assets and listing copy**
+- [x] **Create the Chrome Web Store submission assets and listing copy**
 
   Required assets:
   - Store icon: 128×128 PNG.

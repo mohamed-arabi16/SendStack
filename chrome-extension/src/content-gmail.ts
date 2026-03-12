@@ -180,6 +180,15 @@ async function runEmailJob(contacts: Contact[], template: string, subject: strin
 
     const contact = contacts[i];
     const to = contact.email ?? '';
+
+    // Enforce daily limit before each send
+    const { sent: dailySent, limit: dailyLimit } = await sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT');
+    if (dailySent >= dailyLimit) {
+      failed++;
+      postProgress(i + 1, total, sent, failed, 'skipped', to, 'Daily limit reached');
+      break;
+    }
+
     if (!to) {
       failed++;
       postProgress(i + 1, total, sent, failed, 'skipped', to, 'No email address');

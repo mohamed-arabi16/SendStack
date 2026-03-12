@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhatsApp Send Mock</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+    #chat-area { flex: 1; padding: 20px; background: #efeae2; }
+    footer {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px; background: #f0f2f5; border-top: 1px solid #d1d7db;
+    }
+    [contenteditable] {
+      flex: 1; min-height: 36px; max-height: 120px; border: 1px solid #ccc;
+      border-radius: 8px; padding: 8px 12px; outline: none; font-size: 14px;
+      background: #fff;
+    }
+    [data-testid="send"] {
+      padding: 8px 16px; background: #25d366; color: #fff;
+      border: none; border-radius: 50%; cursor: pointer; font-size: 18px;
+      width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat-area">
+    <p style="color:#555;font-size:13px">WhatsApp send mock — waiting for message…</p>
+  </div>
+
+  <footer>
+    <div
+      contenteditable="true"
+      data-testid="compose-box"
+      aria-label="Type a message"
+      aria-placeholder="Type a message">
+    </div>
+    <button data-testid="send" aria-label="Send">➤</button>
+  </footer>
+
+  <script>
+    // Track how many times Send was clicked (read by tests).
+    window.__waSendClicks = 0;
+
+    document.querySelector('[data-testid="send"]').addEventListener('click', function () {
+      window.__waSendClicks++;
+      // Clear the input to simulate a sent message
+      document.querySelector('[contenteditable]').textContent = '';
+    });
+  </script>
+</body>
+</html>
