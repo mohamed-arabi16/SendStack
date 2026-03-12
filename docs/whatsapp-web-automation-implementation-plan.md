@@ -268,7 +268,7 @@
 
 ### Task 14: Add QR Code Authentication UI Component
 
-- [ ] **Add a QR code display and session management UI to `EmailDashboard.tsx`**
+- [x] **Add a QR code display and session management UI to `EmailDashboard.tsx`**
 
   When WhatsApp mode is active:
   1. Show a "Connect WhatsApp" button if status is `disconnected`.
@@ -289,7 +289,7 @@
 
 ### Task 15: Add Delay & Anti-Ban Settings UI Panel
 
-- [ ] **Add a settings panel in the WhatsApp mode section for delay and anti-ban configuration**
+- [x] **Add a settings panel in the WhatsApp mode section for delay and anti-ban configuration**
 
   The panel should contain:
   1. **Delay Preset Selector** — Radio buttons or dropdown for Fast (5s) / Normal (10s) / Safe (15s) / Custom.
@@ -311,7 +311,7 @@
 
 ### Task 16: Replace `wa.me` Link Logic with Real WhatsApp Sending
 
-- [ ] **Modify the WhatsApp send handler in `EmailDashboard.tsx`**
+- [x] **Modify the WhatsApp send handler in `EmailDashboard.tsx`**
 
   Replace the current `window.open(wa.me/...)` logic with:
   1. Check WhatsApp connection status — if not `ready`, prompt user to connect first.
