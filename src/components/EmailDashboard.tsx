@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import Image from 'next/image';
 import Papa from 'papaparse';
 import {
     Upload, FileText, Send, Settings, CheckCircle, AlertCircle,
@@ -57,6 +58,8 @@ export default function EmailDashboard() {
     const [waDailyCount, setWaDailyCount] = useState(0);
     const [waLimitOverridden, setWaLimitOverridden] = useState(false);
     const [waStatus, setWaStatus] = useState<'disconnected' | 'qr' | 'ready'>('disconnected');
+    const [waQR, setWaQR] = useState<string | null>(null);
+    const [waConnecting, setWaConnecting] = useState(false);
 
     // Load/sync daily WhatsApp send count from localStorage
     useEffect(() => {
@@ -86,9 +89,29 @@ export default function EmailDashboard() {
             } catch { /* ignore */ }
         };
         fetchStatus();
-        const id = setInterval(fetchStatus, 5000);
+        const id = setInterval(fetchStatus, 3000);
         return () => clearInterval(id);
     }, [mode]);
+
+    // Poll WhatsApp QR code when status is 'qr' (Phase 3, Task 14)
+    useEffect(() => {
+        if (mode !== 'whatsapp' || waStatus !== 'qr') {
+            setWaQR(null);
+            return;
+        }
+        const fetchQR = async () => {
+            try {
+                const res = await fetch('/api/whatsapp/qr');
+                if (res.ok) {
+                    const json = await res.json() as { qr: string | null; status: string };
+                    setWaQR(json.qr);
+                }
+            } catch { /* ignore */ }
+        };
+        fetchQR();
+        const id = setInterval(fetchQR, 3000);
+        return () => clearInterval(id);
+    }, [mode, waStatus]);
 
     // --- CSV Parsing ---
     const parseCSV = useCallback((uploadedFile: File) => {
@@ -289,6 +312,26 @@ export default function EmailDashboard() {
         }
     };
 
+    // --- WhatsApp Connect / Disconnect (Phase 3, Task 14) ---
+    const handleConnectWhatsApp = useCallback(async () => {
+        setWaConnecting(true);
+        try {
+            await fetch('/api/whatsapp/init', { method: 'POST' });
+        } catch { /* ignore */ } finally {
+            setWaConnecting(false);
+        }
+    }, []);
+
+    const handleDisconnectWhatsApp = useCallback(async () => {
+        try {
+            const res = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+            if (res.ok) {
+                setWaStatus('disconnected');
+                setWaQR(null);
+            }
+        } catch { /* ignore */ }
+    }, []);
+
     // --- Send WhatsApp ---
     const handleSendWhatsApp = async () => {
         // Check daily limit (Task 12)
@@ -453,6 +496,85 @@ export default function EmailDashboard() {
                     );
                 })}
             </div>
+
+            {/* WhatsApp Connection Panel (Phase 3, Task 14) */}
+            {mode === 'whatsapp' && (
+                <div className="card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <h3 className="card-title" style={{ marginBottom: 0 }}>
+                            <MessageCircle className="w-4 h-4" /> WhatsApp Connection
+                        </h3>
+                        {waStatus === 'ready' && (
+                            <span style={{ background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green)', borderRadius: 'var(--radius-sm)', padding: '3px 12px', fontSize: 13, fontWeight: 500 }}>
+                                ✅ WhatsApp Connected
+                            </span>
+                        )}
+                        {waStatus === 'qr' && (
+                            <span style={{ background: 'var(--amber-bg)', color: 'var(--amber)', border: '1px solid var(--amber)', borderRadius: 'var(--radius-sm)', padding: '3px 12px', fontSize: 13 }}>
+                                📱 Scan QR Code
+                            </span>
+                        )}
+                        {waStatus === 'disconnected' && (
+                            <span style={{ background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red)', borderRadius: 'var(--radius-sm)', padding: '3px 12px', fontSize: 13 }}>
+                                ⚫ Disconnected
+                            </span>
+                        )}
+                    </div>
+
+                    {waStatus === 'disconnected' && (
+                        <button
+                            onClick={handleConnectWhatsApp}
+                            disabled={waConnecting}
+                            className="btn-primary"
+                            style={{ marginTop: 12 }}
+                        >
+                            {waConnecting
+                                ? <RefreshCw className="w-4 h-4 animate-spin" />
+                                : <MessageCircle className="w-4 h-4" />
+                            }
+                            {waConnecting ? 'Connecting…' : 'Connect WhatsApp'}
+                        </button>
+                    )}
+
+                    {waStatus === 'qr' && (
+                        <div style={{ marginTop: 12, textAlign: 'center' }}>
+                            {waQR ? (
+                                <>
+                                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                                        Open WhatsApp on your phone → Menu → Linked Devices → Link a Device
+                                    </p>
+                                    <Image
+                                        src={waQR}
+                                        alt="Scan this QR code with WhatsApp mobile app to link your device"
+                                        width={220}
+                                        height={220}
+                                        unoptimized
+                                        style={{ border: '1px solid var(--border-light)', borderRadius: 8, margin: '0 auto', display: 'block' }}
+                                    />
+                                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>
+                                        QR code auto-refreshes every 3 seconds
+                                    </p>
+                                </>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', padding: '16px 0' }}>
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Loading QR code…</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {waStatus === 'ready' && (
+                        <button
+                            onClick={handleDisconnectWhatsApp}
+                            className="btn-secondary"
+                            style={{ marginTop: 12 }}
+                        >
+                            Disconnect
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Step 1: Upload */}
             {step === 1 && (
@@ -968,12 +1090,12 @@ export default function EmailDashboard() {
                                 }
                             </p>
 
-                            {/* WhatsApp connection status warning (Phase 2) */}
+                            {/* WhatsApp connection status warning (Phase 3, Task 14) */}
                             {mode === 'whatsapp' && waStatus !== 'ready' && (
                                 <div className="help-box" style={{ textAlign: 'left', marginBottom: 12 }}>
                                     <p className="help-title">⚠️ WhatsApp Not Connected</p>
                                     <p style={{ fontSize: 13, marginTop: 4 }}>
-                                        Status: <strong>{waStatus}</strong>. Use the Connect WhatsApp panel to authenticate before sending.
+                                        Status: <strong>{waStatus}</strong>. Use the <strong>WhatsApp Connection</strong> panel above to scan a QR code and authenticate before sending.
                                     </p>
                                 </div>
                             )}
