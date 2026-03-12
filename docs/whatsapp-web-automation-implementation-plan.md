@@ -143,7 +143,7 @@
 
 ### Task 8: Implement Custom Delay Configuration
 
-- [ ] **Add a configurable delay system for WhatsApp message sending**
+- [x] **Add a configurable delay system for WhatsApp message sending**
 
   The system must support **user-selectable delay presets** and a **custom delay option**:
 
@@ -170,7 +170,7 @@
 
 ### Task 9: Implement Randomised Delay Jitter
 
-- [ ] **Add random jitter to the delay to make sending patterns appear more human**
+- [x] **Add random jitter to the delay to make sending patterns appear more human**
 
   Instead of sending at exact fixed intervals (e.g., exactly every 10 seconds), add a random variation:
   - Base delay = user-selected delay (e.g., 10 seconds).
@@ -188,7 +188,7 @@
 
 ### Task 10: Implement Message Variation / Spin Syntax (Anti-Pattern-Detection)
 
-- [ ] **Add optional message spin syntax so WhatsApp doesn't flag identical messages**
+- [x] **Add optional message spin syntax so WhatsApp doesn't flag identical messages**
 
   Support a simple spin syntax in message templates:
   ```
@@ -211,7 +211,7 @@
 
 ### Task 11: Implement Batch Pausing (Cool-Down Periods)
 
-- [ ] **Add automatic cool-down pauses after every N messages**
+- [x] **Add automatic cool-down pauses after every N messages**
 
   To mimic human behaviour and reduce ban risk:
   - After every **batch** of messages (configurable, default 10), pause for a longer period (configurable, default 60 seconds).
@@ -230,7 +230,7 @@
 
 ### Task 12: Implement Daily Send-Limit Safeguard
 
-- [ ] **Add a daily message limit to prevent accidental mass sending that triggers bans**
+- [x] **Add a daily message limit to prevent accidental mass sending that triggers bans**
 
   - Default daily limit: 200 messages per 24-hour rolling window.
   - Track messages sent in `localStorage` (or a lightweight server-side counter).
@@ -248,7 +248,7 @@
 
 ### Task 13: Implement Number Validation Before Sending
 
-- [ ] **Validate phone numbers before attempting to send messages**
+- [x] **Validate phone numbers before attempting to send messages**
 
   Use `whatsapp-web.js`'s `client.isRegisteredUser(number)` method to check if a number is registered on WhatsApp before sending:
   - Before starting a bulk send, validate all numbers in the list.

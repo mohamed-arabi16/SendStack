@@ -123,6 +123,17 @@ export async function sendMessage(phone: string, text: string): Promise<string> 
   return result.id.id;
 }
 
+export async function isRegisteredUser(phone: string): Promise<boolean> {
+  const state = getState();
+
+  if (!state.client || state.status !== 'ready') {
+    throw new Error('WhatsApp client is not ready');
+  }
+
+  const chatId = `${phone}@c.us`;
+  return state.client.isRegisteredUser(chatId);
+}
+
 export async function disconnect(): Promise<void> {
   const state = getState();
 
