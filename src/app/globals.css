@@ -950,6 +950,10 @@ body {
     color: var(--accent);
 }
 
+.log-entry.info {
+    color: var(--amber);
+}
+
 .log-email {
     font-weight: 500;
     word-break: break-all;

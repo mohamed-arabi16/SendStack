@@ -1,13 +1,18 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import Papa from 'papaparse';
 import {
     Upload, FileText, Send, Settings, CheckCircle, AlertCircle,
     RefreshCw, Eye, ChevronLeft, ChevronRight, Clock, Zap, Mail, ArrowRight, MessageCircle, Phone
 } from 'lucide-react';
+import { resolveSpin, applyJitter } from '@/lib/whatsapp-utils';
 
 type CSVRow = Record<string, string>;
+type LogEntry = { email: string; status: 'success' | 'error' | 'info'; message?: string; errorType?: string };
+
+/** Milliseconds for each WhatsApp delay preset */
+const WA_DELAY_PRESETS = { fast: 5000, normal: 10000, safe: 15000 } as const;
 
 export default function EmailDashboard() {
     const [step, setStep] = useState(1);
@@ -28,13 +33,62 @@ export default function EmailDashboard() {
         fromEmail: 'studybuddy@qobouli.com',
     });
     const [sendingStatus, setSendingStatus] = useState<'idle' | 'sending' | 'completed'>('idle');
-    const [logs, setLogs] = useState<{ email: string; status: 'success' | 'error'; message?: string; errorType?: string }[]>([]);
+    const [logs, setLogs] = useState<LogEntry[]>([]);
     const [currentProgress, setCurrentProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [previewRow, setPreviewRow] = useState(0);
     const [showPreview, setShowPreview] = useState(false);
     const [sendDelay, setSendDelay] = useState(2); // seconds between emails
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // --- WhatsApp Anti-Ban Settings (Phase 2) ---
+    const [waDelayPreset, setWaDelayPreset] = useState<'fast' | 'normal' | 'safe' | 'custom'>('normal');
+    const [waCustomDelay, setWaCustomDelay] = useState(10);
+    const [waJitter, setWaJitter] = useState(true);
+    const [waSpinEnabled, setWaSpinEnabled] = useState(true);
+    const [waBatchSize, setWaBatchSize] = useState(10);
+    const [waCoolDown, setWaCoolDown] = useState(60);
+    const [waDailyLimit, setWaDailyLimit] = useState(200);
+    // WhatsApp runtime state
+    const [waCoolDownActive, setWaCoolDownActive] = useState(false);
+    const [waCoolDownRemaining, setWaCoolDownRemaining] = useState(0);
+    const [waValidationResults, setWaValidationResults] = useState<{ phone: string; valid: boolean }[]>([]);
+    const [waValidating, setWaValidating] = useState(false);
+    const [waDailyCount, setWaDailyCount] = useState(0);
+    const [waLimitOverridden, setWaLimitOverridden] = useState(false);
+    const [waStatus, setWaStatus] = useState<'disconnected' | 'qr' | 'ready'>('disconnected');
+
+    // Load/sync daily WhatsApp send count from localStorage
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('wa_daily_send');
+            if (stored) {
+                const { count, date } = JSON.parse(stored) as { count: number; date: string };
+                if (date === new Date().toDateString()) {
+                    setWaDailyCount(count);
+                } else {
+                    localStorage.setItem('wa_daily_send', JSON.stringify({ count: 0, date: new Date().toDateString() }));
+                }
+            }
+        } catch { /* ignore */ }
+    }, []);
+
+    // Poll WhatsApp connection status when in WhatsApp mode
+    useEffect(() => {
+        if (mode !== 'whatsapp') return;
+        const fetchStatus = async () => {
+            try {
+                const res = await fetch('/api/whatsapp/status');
+                if (res.ok) {
+                    const json = await res.json() as { status: 'disconnected' | 'qr' | 'ready' };
+                    setWaStatus(json.status);
+                }
+            } catch { /* ignore */ }
+        };
+        fetchStatus();
+        const id = setInterval(fetchStatus, 5000);
+        return () => clearInterval(id);
+    }, [mode]);
 
     // --- CSV Parsing ---
     const parseCSV = useCallback((uploadedFile: File) => {
@@ -89,6 +143,23 @@ export default function EmailDashboard() {
             if (row[trimmed] !== undefined) return row[trimmed];
             const key = Object.keys(row).find(k => k.trim().toLowerCase() === trimmed.toLowerCase());
             return key ? row[key] : match;
+        });
+    }, []);
+
+    // --- WhatsApp Helpers (Phase 2) ---
+    /** Return base delay in ms based on the selected preset */
+    const getWABaseDelay = useCallback((): number => {
+        return waDelayPreset === 'custom' ? waCustomDelay * 1000 : WA_DELAY_PRESETS[waDelayPreset];
+    }, [waDelayPreset, waCustomDelay]);
+
+    /** Persist the incremented daily count to localStorage */
+    const incrementDailyCount = useCallback((n: number) => {
+        setWaDailyCount(prev => {
+            const next = prev + n;
+            try {
+                localStorage.setItem('wa_daily_send', JSON.stringify({ count: next, date: new Date().toDateString() }));
+            } catch { /* ignore */ }
+            return next;
         });
     }, []);
 
@@ -194,16 +265,48 @@ export default function EmailDashboard() {
         setSendingStatus('completed');
     };
 
+    // --- Validate WhatsApp Numbers (Phase 2, Task 13) ---
+    const handleValidateNumbers = async () => {
+        setWaValidating(true);
+        setWaValidationResults([]);
+        const phones = data
+            .map(row => row[mapping.phone])
+            .filter(Boolean)
+            .map(p => p.replace(/[\s\-\(\)\+]/g, ''));
+
+        try {
+            const res = await fetch('/api/whatsapp/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phones }),
+            });
+            const result = await res.json() as { success: boolean; results?: { phone: string; valid: boolean }[] };
+            if (result.success && result.results) {
+                setWaValidationResults(result.results);
+            }
+        } catch { /* ignore */ } finally {
+            setWaValidating(false);
+        }
+    };
+
     // --- Send WhatsApp ---
     const handleSendWhatsApp = async () => {
+        // Check daily limit (Task 12)
+        const dailyRemaining = waDailyLimit - waDailyCount;
+        if (!waLimitOverridden && dailyRemaining <= 0) {
+            alert('Daily sending limit reached. Override the limit in the settings to continue.');
+            return;
+        }
+
         setSendingStatus('sending');
         setLogs([]);
         setCurrentProgress(0);
+        let sentCount = 0;
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             const rawPhone = row[mapping.phone];
-            const name = mapping.name ? row[mapping.name] : 'Recipient'; // For logs
+            const name = mapping.name ? row[mapping.name] : 'Recipient';
 
             if (!rawPhone) {
                 setLogs(prev => [...prev, { email: `${name} (No Phone)`, status: 'error', message: 'Missing phone number' }]);
@@ -211,44 +314,90 @@ export default function EmailDashboard() {
                 continue;
             }
 
-            // Clean phone number: remove spaces, dashes, parentheses
-            let phone = rawPhone.replace(/[\s\-\(\)]/g, '');
+            const phone = rawPhone.replace(/[\s\-\(\)\+]/g, '');
 
-            // Ensure international format (simplified logic, user can improve)
-            // If starts with 0 (e.g. 050...), replace with country code if needed? 
-            // For now, assume user provides international or we trust WhatsApp to handle partials if local.
-            // But WhatsApp API usually needs clean international format without '+'.
-            // Let's strip '+' if present.
-            phone = phone.replace('+', '');
-
-            // Fallback: If starts with 0, drop it and add '90' (Turkey default) or ask user?
-            // Better: Just use as is and let user fix in CSV if needed, but '0' leading usually fails.
-            if (phone.startsWith('0')) {
-                // Heuristic: If it looks like a local number, maybe warn? 
-                // For this specific user, they have +90...
+            // Skip numbers marked invalid by pre-send validation (Task 13)
+            if (waValidationResults.length > 0) {
+                const vr = waValidationResults.find(r => r.phone === phone);
+                if (vr && !vr.valid) {
+                    setLogs(prev => [...prev, { email: `${name} (${phone})`, status: 'error', message: 'Not on WhatsApp — skipped' }]);
+                    setCurrentProgress(((i + 1) / data.length) * 100);
+                    continue;
+                }
             }
 
+            // Enforce daily limit mid-loop (Task 12)
+            if (!waLimitOverridden && waDailyCount + sentCount >= waDailyLimit) {
+                setLogs(prev => [...prev, { email: `${name} (${phone})`, status: 'error', message: 'Daily limit reached — skipped' }]);
+                setCurrentProgress(((i + 1) / data.length) * 100);
+                continue;
+            }
 
-            const message = renderTemplate(emailContent.body, row);
-            const encodedMessage = encodeURIComponent(message);
-            const url = `https://wa.me/${phone}?text=${encodedMessage}`;
+            // Resolve template variables, then spin syntax if enabled (Tasks 9, 10)
+            let message = renderTemplate(emailContent.body, row);
+            if (waSpinEnabled) {
+                message = resolveSpin(message);
+            }
 
-            // Open in new tab
-            window.open(url, '_blank');
+            try {
+                const res = await fetch('/api/whatsapp/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, message }),
+                });
+                const result = await res.json() as { success: boolean; messageId?: string; error?: string };
 
-            setLogs(prev => [...prev, { email: `${name} (${phone})`, status: 'success', message: 'Opened WhatsApp' }]);
+                if (result.success) {
+                    sentCount++;
+                    setLogs(prev => [...prev, {
+                        email: `${name} (${phone})`,
+                        status: 'success',
+                        message: `Sent — "${message.slice(0, 60)}${message.length > 60 ? '…' : ''}"`,
+                    }]);
+                } else {
+                    setLogs(prev => [...prev, { email: `${name} (${phone})`, status: 'error', message: result.error }]);
+                }
+            } catch {
+                setLogs(prev => [...prev, { email: `${name} (${phone})`, status: 'error', message: 'Network error — check your connection' }]);
+            }
+
             setCurrentProgress(((i + 1) / data.length) * 100);
 
-            // Wait for user to send in the other tab (we can't know, so just pause briefly)
-            // A small delay helps keep browser from blocking too many popups
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            if (i < data.length - 1) {
+                // Batch cool-down pause (Task 11): trigger after every batchSize *sent* messages
+                if (sentCount > 0 && sentCount % waBatchSize === 0) {
+                    setWaCoolDownActive(true);
+                    let cd = waCoolDown;
+                    setWaCoolDownRemaining(cd);
+                    setLogs(prev => [...prev, { email: '⏸', status: 'info', message: `Batch of ${waBatchSize} sent — cooling down for ${waCoolDown}s…` }]);
+                    while (cd > 0) {
+                        await new Promise(r => setTimeout(r, 1000));
+                        cd--;
+                        setWaCoolDownRemaining(cd);
+                    }
+                    setWaCoolDownActive(false);
+                } else {
+                    // Regular delay with optional jitter (Tasks 8 & 9)
+                    const baseMs = getWABaseDelay();
+                    const actualMs = waJitter ? applyJitter(baseMs) : baseMs;
+                    const actualSec = (actualMs / 1000).toFixed(1);
+                    setLogs(prev => [...prev, { email: '⏳', status: 'info', message: `Waiting ${actualSec}s before next message…` }]);
+                    await new Promise(r => setTimeout(r, actualMs));
+                }
+            }
         }
+
+        // Persist daily count (Task 12)
+        incrementDailyCount(sentCount);
         setSendingStatus('completed');
     };
 
     // --- Stats ---
     const successCount = logs.filter(l => l.status === 'success').length;
     const errorCount = logs.filter(l => l.status === 'error').length;
+
+    /** 80 % threshold for the daily-limit warning */
+    const waDailyWarningThreshold = useMemo(() => Math.floor(waDailyLimit * 0.8), [waDailyLimit]);
 
     const stepLabels = ['Upload', 'Map Columns', 'Compose', 'Send'];
 
@@ -538,33 +687,37 @@ export default function EmailDashboard() {
                         </h3>
 
                         <div className="smtp-grid">
-                            <div className="field-group">
-                                <label className="field-label">From Name</label>
-                                <input
-                                    type="text"
-                                    placeholder="StudyBuddy"
-                                    value={smtpConfig.fromName}
-                                    onChange={e => setSmtpConfig({ ...smtpConfig, fromName: e.target.value })}
-                                    className="field-input"
-                                />
-                            </div>
-                            <div className="field-group">
-                                <label className="field-label">
-                                    Delay Between Emails
-                                </label>
-                                <div className="delay-input-wrapper">
-                                    <Clock className="w-4 h-4 delay-icon" />
+                            {mode === 'email' && (
+                                <div className="field-group">
+                                    <label className="field-label">From Name</label>
                                     <input
-                                        type="number"
-                                        min={0}
-                                        max={30}
-                                        value={sendDelay}
-                                        onChange={e => setSendDelay(Number(e.target.value))}
-                                        className="field-input delay-input"
+                                        type="text"
+                                        placeholder="StudyBuddy"
+                                        value={smtpConfig.fromName}
+                                        onChange={e => setSmtpConfig({ ...smtpConfig, fromName: e.target.value })}
+                                        className="field-input"
                                     />
-                                    <span className="delay-suffix">seconds</span>
                                 </div>
-                            </div>
+                            )}
+                            {mode === 'email' && (
+                                <div className="field-group">
+                                    <label className="field-label">
+                                        Delay Between Emails
+                                    </label>
+                                    <div className="delay-input-wrapper">
+                                        <Clock className="w-4 h-4 delay-icon" />
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={30}
+                                            value={sendDelay}
+                                            onChange={e => setSendDelay(Number(e.target.value))}
+                                            className="field-input delay-input"
+                                        />
+                                        <span className="delay-suffix">seconds</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {mode === 'email' && (
@@ -677,6 +830,114 @@ export default function EmailDashboard() {
                         )}
                     </div>
 
+                    {/* WhatsApp Anti-Ban Settings Panel (Phase 2, Tasks 8–12) */}
+                    {mode === 'whatsapp' && (
+                        <div className="card">
+                            <h3 className="card-title">
+                                <Zap className="w-4 h-4" /> WhatsApp Anti-Ban Settings
+                            </h3>
+
+                            {/* Delay preset (Task 8) */}
+                            <div className="field-group">
+                                <label className="field-label">Delay Between Messages</label>
+                                <div className="flex gap-2 flex-wrap">
+                                    {(['fast', 'normal', 'safe', 'custom'] as const).map(p => (
+                                        <button
+                                            key={p}
+                                            onClick={() => setWaDelayPreset(p)}
+                                            className={`px-3 py-1 text-sm rounded-md border transition-all ${waDelayPreset === p ? 'bg-green-50 border-green-400 text-green-700 font-medium' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}
+                                        >
+                                            {p === 'fast' ? 'Fast (5s)' : p === 'normal' ? 'Normal (10s)' : p === 'safe' ? 'Safe (15s)' : 'Custom'}
+                                        </button>
+                                    ))}
+                                </div>
+                                {waDelayPreset === 'custom' && (
+                                    <div className="delay-input-wrapper mt-2">
+                                        <Clock className="w-4 h-4 delay-icon" />
+                                        <input
+                                            type="number"
+                                            min={3}
+                                            max={60}
+                                            value={waCustomDelay}
+                                            onChange={e => setWaCustomDelay(Math.min(60, Math.max(3, Number(e.target.value))))}
+                                            className="field-input delay-input"
+                                        />
+                                        <span className="delay-suffix">seconds (3–60)</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="smtp-grid">
+                                {/* Batch size (Task 11) */}
+                                <div className="field-group">
+                                    <label className="field-label">Batch Size (messages before pause)</label>
+                                    <input
+                                        type="number"
+                                        min={5}
+                                        max={50}
+                                        value={waBatchSize}
+                                        onChange={e => setWaBatchSize(Math.min(50, Math.max(5, Number(e.target.value))))}
+                                        className="field-input"
+                                    />
+                                    <p className="field-hint">Range 5–50. Default: 10.</p>
+                                </div>
+                                {/* Cool-down (Task 11) */}
+                                <div className="field-group">
+                                    <label className="field-label">Cool-Down Duration (seconds)</label>
+                                    <input
+                                        type="number"
+                                        min={30}
+                                        max={300}
+                                        value={waCoolDown}
+                                        onChange={e => setWaCoolDown(Math.min(300, Math.max(30, Number(e.target.value))))}
+                                        className="field-input"
+                                    />
+                                    <p className="field-hint">Range 30–300. Default: 60.</p>
+                                </div>
+                            </div>
+
+                            {/* Daily limit (Task 12) */}
+                            <div className="field-group">
+                                <label className="field-label">Daily Send Limit</label>
+                                <div className="delay-input-wrapper">
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        value={waDailyLimit}
+                                        onChange={e => setWaDailyLimit(Math.max(1, Number(e.target.value)))}
+                                        className="field-input delay-input"
+                                    />
+                                    <span className="delay-suffix">messages · {waDailyCount} sent today</span>
+                                </div>
+                                {waDailyCount >= waDailyWarningThreshold && waDailyCount < waDailyLimit && (
+                                    <p className="field-warning">⚠️ Approaching daily limit ({waDailyCount}/{waDailyLimit})</p>
+                                )}
+                            </div>
+
+                            {/* Toggles (Tasks 9 & 10) */}
+                            <div className="flex gap-6 flex-wrap">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={waJitter}
+                                        onChange={e => setWaJitter(e.target.checked)}
+                                        className="checkbox-input"
+                                    />
+                                    Random delay jitter (±30–50%)
+                                </label>
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={waSpinEnabled}
+                                        onChange={e => setWaSpinEnabled(e.target.checked)}
+                                        className="checkbox-input"
+                                    />
+                                    Message spin syntax <code>{'{Hi|Hello|Hey}'}</code>
+                                </label>
+                            </div>
+                        </div>
+                    )}
+
                     <button
                         onClick={() => setStep(4)}
                         disabled={
@@ -707,6 +968,77 @@ export default function EmailDashboard() {
                                 }
                             </p>
 
+                            {/* WhatsApp connection status warning (Phase 2) */}
+                            {mode === 'whatsapp' && waStatus !== 'ready' && (
+                                <div className="help-box" style={{ textAlign: 'left', marginBottom: 12 }}>
+                                    <p className="help-title">⚠️ WhatsApp Not Connected</p>
+                                    <p style={{ fontSize: 13, marginTop: 4 }}>
+                                        Status: <strong>{waStatus}</strong>. Use the Connect WhatsApp panel to authenticate before sending.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Daily limit warning / block (Task 12) */}
+                            {mode === 'whatsapp' && (
+                                <>
+                                    {waDailyCount >= waDailyLimit && !waLimitOverridden ? (
+                                        <div className="help-box" style={{ textAlign: 'left', marginBottom: 12 }}>
+                                            <p className="help-title">🚫 Daily Limit Reached ({waDailyCount}/{waDailyLimit})</p>
+                                            <p style={{ fontSize: 13, marginTop: 4 }}>Sending is blocked. Override below to continue (ban risk!).</p>
+                                            <button
+                                                className="btn-secondary"
+                                                style={{ marginTop: 8 }}
+                                                onClick={() => {
+                                                    if (window.confirm('⚠️ You have reached the daily limit. Sending more messages increases your ban risk. Are you sure you want to continue?')) {
+                                                        setWaLimitOverridden(true);
+                                                    }
+                                                }}
+                                            >
+                                                Override Daily Limit
+                                            </button>
+                                        </div>
+                                    ) : waDailyCount >= waDailyWarningThreshold ? (
+                                        <div style={{ background: 'var(--amber-bg)', border: '1px solid var(--amber)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--amber)' }}>
+                                            ⚠️ Approaching daily limit: {waDailyCount}/{waDailyLimit} messages sent today.
+                                        </div>
+                                    ) : null}
+                                </>
+                            )}
+
+                            {/* Number Validation (Task 13) */}
+                            {mode === 'whatsapp' && (
+                                <div style={{ marginBottom: 12, width: '100%' }}>
+                                    {waValidationResults.length === 0 ? (
+                                        <button
+                                            onClick={handleValidateNumbers}
+                                            disabled={waValidating || waStatus !== 'ready'}
+                                            className="btn-secondary"
+                                            style={{ width: '100%' }}
+                                        >
+                                            <Phone className="w-4 h-4" />
+                                            {waValidating ? 'Validating numbers…' : 'Validate Numbers (optional)'}
+                                        </button>
+                                    ) : (
+                                        <div style={{ background: 'var(--green-bg)', border: '1px solid var(--green)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: 13 }}>
+                                            <strong style={{ color: 'var(--green)' }}>
+                                                ✅ {waValidationResults.filter(r => r.valid).length} valid
+                                            </strong>
+                                            {' · '}
+                                            <strong style={{ color: 'var(--red)' }}>
+                                                {waValidationResults.filter(r => !r.valid).length} not on WhatsApp
+                                            </strong>
+                                            {' '}(will be skipped)
+                                            <button
+                                                onClick={() => setWaValidationResults([])}
+                                                style={{ marginLeft: 12, fontSize: 12, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
+                                            >
+                                                Clear
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="launch-summary">
                                 {mode === 'email' && (
                                     <div className="summary-item">
@@ -714,13 +1046,27 @@ export default function EmailDashboard() {
                                         <span>{sendDelay}s delay between emails</span>
                                     </div>
                                 )}
+                                {mode === 'whatsapp' && (
+                                    <div className="summary-item">
+                                        <Clock className="w-4 h-4" />
+                                        <span>
+                                            {waDelayPreset === 'custom' ? `${waCustomDelay}s` : `${WA_DELAY_PRESETS[waDelayPreset] / 1000}s`} delay
+                                            {waJitter ? ' + jitter' : ''}
+                                            {' · '}pause every {waBatchSize} msgs for {waCoolDown}s
+                                        </span>
+                                    </div>
+                                )}
                                 <div className="summary-item">
                                     <Clock className="w-4 h-4" />
-                                    <span>~{Math.ceil(data.length * (mode === 'email' ? sendDelay : 5) / 60)} min total</span>
+                                    <span>~{Math.ceil(data.length * (mode === 'email' ? sendDelay : getWABaseDelay() / 1000) / 60)} min total</span>
                                 </div>
                             </div>
 
-                            <button onClick={mode === 'email' ? handleSendEmails : handleSendWhatsApp} className="btn-send">
+                            <button
+                                onClick={mode === 'email' ? handleSendEmails : handleSendWhatsApp}
+                                disabled={mode === 'whatsapp' && !waLimitOverridden && waDailyCount >= waDailyLimit}
+                                className="btn-send"
+                            >
                                 {mode === 'email' ? <Send className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
                                 {mode === 'email' ? 'Start Sending' : 'Start Messaging'}
                             </button>
@@ -734,7 +1080,9 @@ export default function EmailDashboard() {
                     {(sendingStatus === 'sending' || sendingStatus === 'completed') && (
                         <div className="results-section">
                             <h3 className="results-title">
-                                {sendingStatus === 'sending' ? 'Sending in progress…' : 'Sending Complete'}
+                                {sendingStatus === 'sending'
+                                    ? (waCoolDownActive ? `⏸ Cool-Down — resuming in ${waCoolDownRemaining}s…` : 'Sending in progress…')
+                                    : 'Sending Complete'}
                             </h3>
 
                             {/* Progress Bar */}
@@ -744,7 +1092,7 @@ export default function EmailDashboard() {
                                     style={{ width: `${currentProgress}%` }}
                                 />
                             </div>
-                            <p className="progress-text">{Math.round(currentProgress)}% — {logs.length} of {data.length} processed</p>
+                            <p className="progress-text">{Math.round(currentProgress)}% — {logs.filter(l => l.status !== 'info').length} of {data.length} processed</p>
 
                             {/* Stats */}
                             {logs.length > 0 && (
@@ -756,15 +1104,13 @@ export default function EmailDashboard() {
                                             <p className="stat-label">Delivered</p>
                                         </div>
                                     </div>
-                                    {mode === 'email' && (
-                                        <div className="stat-card error">
-                                            <AlertCircle className="w-5 h-5" />
-                                            <div>
-                                                <p className="stat-number">{errorCount}</p>
-                                                <p className="stat-label">Failed</p>
-                                            </div>
+                                    <div className="stat-card error">
+                                        <AlertCircle className="w-5 h-5" />
+                                        <div>
+                                            <p className="stat-number">{errorCount}</p>
+                                            <p className="stat-label">Failed</p>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             )}
 
@@ -774,12 +1120,14 @@ export default function EmailDashboard() {
                                     <div key={i} className={`log-entry ${log.status}`}>
                                         {log.status === 'success'
                                             ? <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                                            : log.status === 'info'
+                                            ? <Clock className="w-4 h-4 flex-shrink-0" />
                                             : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
                                         <span className="log-email">{log.email}</span>
                                         {log.message && <span className="log-message">— {log.message}</span>}
                                     </div>
                                 ))}
-                                {sendingStatus === 'sending' && (
+                                {sendingStatus === 'sending' && !waCoolDownActive && (
                                     <div className="log-entry sending">
                                         <RefreshCw className="w-4 h-4 animate-spin flex-shrink-0" />
                                         <span>{mode === 'email' ? 'Sending next email…' : 'Preparing next message…'}</span>
