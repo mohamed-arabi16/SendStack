@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gmail Mock</title>
+  <style>body { font-family: sans-serif; margin: 20px; }</style>
+</head>
+<body>
+  <!-- Content script waits for [role="navigation"] before injecting the panel -->
+  <div role="navigation" id="nav" style="padding:10px;background:#f1f3f4;border-radius:4px;margin-bottom:16px">
+    📧 Gmail (mock)
+  </div>
+
+  <button gh="cm" id="compose-btn"
+    style="padding:10px 20px;background:#1a73e8;color:#fff;border:none;border-radius:24px;cursor:pointer;font-size:14px">
+    ✏️ Compose
+  </button>
+
+  <div id="info" style="margin-top:20px;color:#555;font-size:13px">
+    Compose cycles: <span id="cycle-count">0</span>
+  </div>
+
+  <script>
+    // Track how many compose dialogs have been opened (read by tests)
+    window.__composeCycles = 0;
+
+    document.getElementById('compose-btn').addEventListener('click', openCompose);
+
+    // Content script may also dispatch a 'c' keydown when the compose button
+    // isn't found; handle that too.
+    document.body.addEventListener('keydown', function (e) {
+      if (e.key === 'c' && !e.target.matches('input,textarea,[contenteditable]')) {
+        openCompose();
+      }
+    });
+
+    function openCompose() {
+      window.__composeCycles++;
+      document.getElementById('cycle-count').textContent = String(window.__composeCycles);
+
+      var dialog = document.createElement('div');
+      dialog.setAttribute('role', 'dialog');
+      dialog.style.cssText = [
+        'position:fixed', 'bottom:0', 'right:20px', 'width:500px',
+        'background:#fff', 'border:1px solid #ccc', 'border-radius:8px 8px 0 0',
+        'box-shadow:0 4px 20px rgba(0,0,0,0.3)', 'z-index:10000', 'padding:16px',
+      ].join(';');
+
+      dialog.innerHTML = [
+        '<div style="font-weight:600;margin-bottom:8px">New Message</div>',
+        '<input name="to" placeholder="To"',
+        '  style="display:block;width:100%;padding:6px;margin-bottom:6px;border:1px solid #ccc;box-sizing:border-box" />',
+        '<input name="subjectbox" placeholder="Subject"',
+        '  style="display:block;width:100%;padding:6px;margin-bottom:6px;border:1px solid #ccc;box-sizing:border-box" />',
+        '<div role="textbox" aria-label="Message Body" contenteditable="true"',
+        '  style="min-height:80px;border:1px solid #ccc;padding:6px;margin-bottom:8px;outline:none"></div>',
+        '<button data-tooltip="Send " aria-label="Send"',
+        '  style="padding:8px 20px;background:#1a73e8;color:#fff;border:none;border-radius:4px;cursor:pointer">',
+        '  Send',
+        '</button>',
+      ].join('');
+
+      // Clicking Send removes the dialog (simulates Gmail closing the compose window)
+      dialog.querySelector('button').addEventListener('click', function () {
+        dialog.remove();
+      });
+
+      document.body.appendChild(dialog);
+
+      // Auto-focus the To field so the content script can set its value
+      setTimeout(function () {
+        var toField = dialog.querySelector('input[name="to"]');
+        if (toField) toField.focus();
+      }, 30);
+    }
+  </script>
+</body>
+</html>

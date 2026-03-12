@@ -4,8 +4,58 @@
 
 import type { ExtensionSettings, Job } from './lib/storage';
 import { getSettings, saveSettings, getDailyCount, incrementCount, resetCount } from './lib/storage';
+import type { Contact } from './lib/csv-parser';
 
 const jobs = new Map<string, Job>();
+
+// ---- WhatsApp bulk-job state (survives page navigations) ----
+
+export interface WaJobState {
+  jobId: string;
+  contacts: Contact[];
+  template: string;
+  settings: ExtensionSettings;
+  currentIndex: number;
+  sent: number;
+  failed: number;
+  status: 'running' | 'cancelled' | 'completed';
+}
+
+let _activeWaJob: WaJobState | null = null;
+
+async function storeWaJob(job: WaJobState): Promise<void> {
+  _activeWaJob = job;
+  return new Promise((resolve) => chrome.storage.local.set({ activeWaJob: job }, resolve));
+}
+
+async function getActiveWaJob(): Promise<WaJobState | null> {
+  if (_activeWaJob?.status === 'running') return _activeWaJob;
+  return new Promise((resolve) => {
+    chrome.storage.local.get('activeWaJob', (result) => {
+      const job = result['activeWaJob'] as WaJobState | undefined;
+      _activeWaJob = (job?.status === 'running') ? job : null;
+      resolve(_activeWaJob);
+    });
+  });
+}
+
+async function advanceWaJob(
+  updates: { sent: number; failed: number }
+): Promise<{ nextIndex: number; status: WaJobState['status'] }> {
+  const job = await getActiveWaJob();
+  if (!job) return { nextIndex: -1, status: 'completed' };
+  job.currentIndex++;
+  job.sent = updates.sent;
+  job.failed = updates.failed;
+  if (job.currentIndex >= job.contacts.length) job.status = 'completed';
+  await storeWaJob(job);
+  return { nextIndex: job.currentIndex, status: job.status };
+}
+
+async function cancelWaJob(): Promise<void> {
+  if (_activeWaJob) { _activeWaJob.status = 'cancelled'; await storeWaJob(_activeWaJob); }
+  else { return new Promise((resolve) => chrome.storage.local.remove('activeWaJob', resolve)); }
+}
 
 // Set default settings on install
 chrome.runtime.onInstalled.addListener(async () => {
@@ -84,6 +134,20 @@ async function handleMessage(message: { action: string; payload?: Record<string,
       if (job) { job.status = 'cancelled'; jobs.set(jobId, job); }
       return { ok: true };
     }
+    // WhatsApp cross-navigation job state
+    case 'STORE_WA_JOB': {
+      await storeWaJob(message.payload as unknown as WaJobState);
+      return { ok: true };
+    }
+    case 'GET_ACTIVE_WA_JOB':
+      return getActiveWaJob();
+    case 'ADVANCE_WA_JOB': {
+      const { sent, failed } = message.payload as { sent: number; failed: number };
+      return advanceWaJob({ sent, failed });
+    }
+    case 'CANCEL_WA_JOB':
+      await cancelWaJob();
+      return { ok: true };
     default:
       return { error: `Unknown action: ${message.action}` };
   }
