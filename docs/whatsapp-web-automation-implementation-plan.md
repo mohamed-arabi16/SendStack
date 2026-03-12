@@ -449,7 +449,7 @@ The following methods are integrated across the tasks above to minimise the risk
 |---|---|---|
 | **Custom Delay** | Task 8 | User-selectable delay (5s, 10s, 15s, or custom) between each message |
 | **Random Jitter** | Task 9 | ±30–50% variation on delay to avoid robotic fixed-interval patterns |
-| **Message Variation (Spin Syntax)** | Task 10 | `{Hi\|Hello\|Hey}` syntax so no two messages are identical |
+| **Message Variation (Spin Syntax)** | Task 10 | Spin syntax (e.g., `{Hi or Hello or Hey}`) so no two messages are identical |
 | **Batch Cool-Down** | Task 11 | Automatic 60s pause after every 10 messages (configurable) |
 | **Daily Send Limit** | Task 12 | Hard cap of 200 messages/day to stay under WhatsApp's radar |
 | **Number Validation** | Task 13 | Skip numbers not on WhatsApp to avoid "not found" flags |
