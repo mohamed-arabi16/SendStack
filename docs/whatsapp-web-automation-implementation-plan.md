@@ -10,7 +10,7 @@
 
 ### Task 1: Install Dependencies
 
-- [ ] **Install `whatsapp-web.js`, `qrcode`, and their type definitions**
+- [x] **Install `whatsapp-web.js`, `qrcode`, and their type definitions**
 
   ```bash
   npm install whatsapp-web.js qrcode
@@ -27,7 +27,7 @@
 
 ### Task 2: Create the WhatsApp Client Singleton Service
 
-- [ ] **Create `src/lib/whatsapp-client.ts`** — a singleton module that manages the entire WhatsApp Web session lifecycle.
+- [x] **Create `src/lib/whatsapp-client.ts`** — a singleton module that manages the entire WhatsApp Web session lifecycle.
 
   The service must expose:
 
@@ -58,7 +58,7 @@
 
 ### Task 3: Create API Route — `POST /api/whatsapp/init`
 
-- [ ] **Create `src/app/api/whatsapp/init/route.ts`**
+- [x] **Create `src/app/api/whatsapp/init/route.ts`**
 
   - Import the singleton client from `src/lib/whatsapp-client.ts`.
   - If the client is already initialised and connected, return `{ status: 'already_connected' }`.
@@ -74,7 +74,7 @@
 
 ### Task 4: Create API Route — `GET /api/whatsapp/qr`
 
-- [ ] **Create `src/app/api/whatsapp/qr/route.ts`**
+- [x] **Create `src/app/api/whatsapp/qr/route.ts`**
 
   - Use the `qrcode` npm package to convert the QR string from the singleton into a base64 data URL.
   - If no QR is available (e.g., already authenticated or not yet initialised), return `{ qr: null, status: <current_status> }`.
@@ -89,7 +89,7 @@
 
 ### Task 5: Create API Route — `GET /api/whatsapp/status`
 
-- [ ] **Create `src/app/api/whatsapp/status/route.ts`**
+- [x] **Create `src/app/api/whatsapp/status/route.ts`**
 
   - Return the current connection status from the singleton: `disconnected`, `qr`, or `ready`.
   - Include additional info when available: connected phone number, name, etc.
@@ -102,7 +102,7 @@
 
 ### Task 6: Create API Route — `POST /api/whatsapp/send`
 
-- [ ] **Create `src/app/api/whatsapp/send/route.ts`**
+- [x] **Create `src/app/api/whatsapp/send/route.ts`**
 
   Request body:
   ```json
@@ -128,7 +128,7 @@
 
 ### Task 7: Create API Route — `POST /api/whatsapp/disconnect`
 
-- [ ] **Create `src/app/api/whatsapp/disconnect/route.ts`**
+- [x] **Create `src/app/api/whatsapp/disconnect/route.ts`**
 
   - Call `disconnect()` on the singleton.
   - Return `{ status: 'disconnected' }`.
