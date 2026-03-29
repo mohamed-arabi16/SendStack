@@ -63,6 +63,16 @@ async function injectPanel() {
 
   // Listen for messages from the panel iframe
   window.addEventListener('message', handlePanelMessage);
+
+  // Forward progress messages to the panel iframe
+  window.addEventListener('message', (event) => {
+    const data = event.data as { type?: string };
+    if (!data?.type) return;
+    if (data.type === 'BULK_SENDER_PROGRESS' || data.type === 'BULK_SENDER_COOLDOWN' || data.type === 'BULK_SENDER_COMPLETE') {
+      const panelIframe = shadowRoot.querySelector('iframe');
+      panelIframe?.contentWindow?.postMessage(event.data, '*');
+    }
+  });
 }
 
 function togglePanel() {

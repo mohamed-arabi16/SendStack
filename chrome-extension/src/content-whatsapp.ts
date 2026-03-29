@@ -144,8 +144,8 @@ async function processCurrentContact(): Promise<void> {
 
   // Navigate to next contact
   const nextContact = job.contacts[nextIndex];
-  if (nextContact?.phone) {
-    const nextPhone = nextContact.phone.replace(/[\s\-+]/g, '');
+  const nextPhone = nextContact?.phone?.replace(/[\s\-+]/g, '') ?? '';
+  if (nextPhone) {
     window.location.href = `https://web.whatsapp.com/send?phone=${nextPhone}`;
   }
 }

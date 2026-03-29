@@ -62,13 +62,13 @@ export async function loadContactsFromStorage(): Promise<Contact[] | null> {
 
 /**
  * Resolve {{Variable}} placeholders using contact data.
- * Sanitizes by stripping HTML tags for safety.
+ * Strips HTML tags from values to prevent injection.
  */
 export function resolveTemplate(template: string, contact: Contact): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
     const value = contact[key] ?? contact[key.toLowerCase()] ?? '';
-    // Strip any potential HTML tags for safety
-    return String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Strip HTML tags (not escape — messages are inserted as plain text)
+    return String(value).replace(/<[^>]*>/g, '');
   });
 }
 
