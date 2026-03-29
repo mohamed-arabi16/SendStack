@@ -39,19 +39,43 @@ export default function App() {
   const [dailyCount, setDailyCount] = useState({ sent: 0, limit: 200 });
   const [csvWarning, setCsvWarning] = useState('');
   const [errorBanner, setErrorBanner] = useState('');
+  const [preflight, setPreflight] = useState<{ ready: boolean; failures: string[] } | null>(null);
+  const [haltedJob, setHaltedJob] = useState<{ sent: number; total: number; error: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load settings and daily count on mount
   useEffect(() => {
-    sendToBackground<ExtensionSettings>('GET_SETTINGS').then(setSettings).catch(console.error);
-    sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT').then(setDailyCount).catch(console.error);
+    sendToBackground<ExtensionSettings>('GET_SETTINGS')
+      .then(setSettings)
+      .catch(() => setErrorBanner('Failed to load settings — using defaults'));
+
+    sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT')
+      .then(setDailyCount)
+      .catch(() => setErrorBanner('Failed to load daily count'));
+
     loadContactsFromStorage().then((saved) => {
       if (saved && saved.length > 0) {
         setContacts(saved);
         setHeaders(Object.keys(saved[0]));
       }
-    }).catch(console.error);
+    }).catch(() => setErrorBanner('Failed to load saved contacts'));
+
+    if (initialMode === 'whatsapp') {
+      sendToBackground<{ status?: string; sent?: number; failed?: number; lastError?: string; contacts?: unknown[] } | null>('GET_ACTIVE_WA_JOB')
+        .then((job) => {
+          if (job && job.status === 'halted') {
+            setHaltedJob({
+              sent: job.sent ?? 0,
+              total: (job.contacts as unknown[])?.length ?? 0,
+              error: job.lastError ?? 'Unknown error',
+            });
+          }
+        })
+        .catch(() => {});
+    }
+
+    window.parent.postMessage({ type: 'PREFLIGHT_CHECK' }, '*');
   }, []);
 
   // Listen for progress events from content script
@@ -60,7 +84,13 @@ export default function App() {
       const data = event.data as { type: string; [key: string]: unknown };
       if (!data?.type) return;
 
-      if (data.type === 'BULK_SENDER_PROGRESS') {
+      if (data.type === 'PREFLIGHT_RESULT') {
+        const { ready, failures } = data as unknown as { ready: boolean; failures: string[] };
+        setPreflight({ ready, failures });
+      } else if (data.type === 'JOB_START_ERROR') {
+        setErrorBanner(`Failed to start job: ${data.error}`);
+        setStatus('idle');
+      } else if (data.type === 'BULK_SENDER_PROGRESS') {
         const { current, total, sent, failed, status: st, recipient, error } = data as unknown as {
           current: number; total: number; sent: number; failed: number;
           status: string; recipient: string; error?: string;
@@ -88,10 +118,17 @@ export default function App() {
           });
         }, 1000);
       } else if (data.type === 'BULK_SENDER_COMPLETE') {
-        const { sent, failed, skipped } = data as unknown as { sent: number; failed: number; skipped: number };
+        const { sent, failed, skipped, halted, error } = data as unknown as {
+          sent: number; failed: number; skipped: number; halted?: boolean; error?: string;
+        };
         setSummary({ sent, failed, skipped });
         setStatus('completed');
-        sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT').then(setDailyCount).catch(console.error);
+        if (halted && error) {
+          setErrorBanner(error);
+        }
+        sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT')
+          .then(setDailyCount)
+          .catch(() => {});
       }
     }
     window.addEventListener('message', handleMessage);
@@ -175,6 +212,57 @@ export default function App() {
         <div style={{ background: 'rgba(255, 59, 48, 0.15)', color: '#ff3b30', padding: '8px 16px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>{errorBanner}</span>
           <button onClick={() => setErrorBanner('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff3b30', fontWeight: 700 }}>✕</button>
+        </div>
+      )}
+
+      {/* Pre-flight status */}
+      {preflight && !preflight.ready && (
+        <div style={{ background: '#fce8e6', color: '#c5221f', padding: '8px 16px', fontSize: '12px', borderBottom: '1px solid #e0e0e0' }}>
+          <b>Blocked:</b> Cannot find: {preflight.failures.join(', ')}. The site UI may have changed — extension may need an update.
+        </div>
+      )}
+      {preflight && preflight.ready && status === 'idle' && (
+        <div style={{ background: '#e6f4ea', color: '#137333', padding: '6px 16px', fontSize: '12px', borderBottom: '1px solid #a8d5b5' }}>
+          Ready to send
+        </div>
+      )}
+
+      {/* Halted job recovery */}
+      {haltedJob && (
+        <div style={{ background: '#fef7e0', color: '#8a6d3b', padding: '10px 16px', fontSize: '12px', borderBottom: '1px solid #f0d58c' }}>
+          <div style={{ marginBottom: '6px' }}>
+            <b>Previous job halted</b> after sending {haltedJob.sent}/{haltedJob.total} messages.
+          </div>
+          <div style={{ marginBottom: '8px', fontSize: '11px' }}>Error: {haltedJob.error}</div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={() => {
+                sendToBackground('STORE_WA_JOB', { status: 'running', consecutiveFailures: 0, lastError: '' } as unknown as Record<string, unknown>)
+                  .then(() => sendToBackground<{ contacts: { phone?: string }[]; currentIndex: number } | null>('GET_ACTIVE_WA_JOB'))
+                  .then((job) => {
+                    if (job) {
+                      const next = job.contacts[job.currentIndex];
+                      const phone = next?.phone?.replace(/[\s\-+]/g, '') ?? '';
+                      if (phone) window.parent.location.href = `https://web.whatsapp.com/send?phone=${phone}`;
+                    }
+                    setHaltedJob(null);
+                  })
+                  .catch(() => setErrorBanner('Failed to resume job'));
+              }}
+              style={{ padding: '4px 12px', background: '#25d366', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
+            >
+              Resume
+            </button>
+            <button
+              onClick={() => {
+                sendToBackground('CANCEL_WA_JOB', {}).catch(() => {});
+                setHaltedJob(null);
+              }}
+              style={{ padding: '4px 12px', background: '#d93025', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
+            >
+              Discard
+            </button>
+          </div>
         </div>
       )}
 
@@ -271,7 +359,7 @@ export default function App() {
                 <label htmlFor="spin" style={{ fontSize: '12px', color: '#a1a1aa' }}>Enable spin syntax {'{'+'A|B|C}'}</label>
               </div>
               <button
-                onClick={() => sendToBackground('SAVE_SETTINGS', settings as unknown as Record<string, unknown>).catch(console.error)}
+                onClick={() => sendToBackground('SAVE_SETTINGS', settings as unknown as Record<string, unknown>).catch(() => setErrorBanner('Failed to save settings'))}
                 style={{ padding: '6px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
               >
                 Save Settings
@@ -284,7 +372,7 @@ export default function App() {
         <section style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={startJob}
-            disabled={status === 'sending' || status === 'cooldown'}
+            disabled={status === 'sending' || status === 'cooldown' || (preflight !== null && !preflight.ready)}
             style={{ flex: 1, padding: '10px', background: status === 'sending' ? '#262626' : '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor: status === 'sending' ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '14px' }}
           >
             {status === 'sending' ? 'Sending...' : status === 'cooldown' ? `Cooldown ${cooldownRemaining}s` : 'Send Now'}
