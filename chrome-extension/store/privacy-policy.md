@@ -1,12 +1,12 @@
-# Privacy Policy — Bulk Email & WhatsApp Sender
+# Privacy Policy — SendStack — Bulk Messaging
 
-*Last updated: 2026-03-12*
+*Last updated: 2026-03-29*
 
 ---
 
 ## Overview
 
-Bulk Email & WhatsApp Sender ("the Extension") is a browser extension for Google Chrome that helps you send personalised bulk emails and WhatsApp messages directly from Gmail and WhatsApp Web.
+SendStack — Bulk Messaging ("the Extension") is a browser extension for Google Chrome that helps you send personalised bulk emails and WhatsApp messages directly from Gmail and WhatsApp Web.
 
 We are committed to protecting your privacy.  This policy explains exactly what data the Extension collects, how it is stored, and what it is never used for.
 

@@ -1,16 +1,16 @@
-# Chrome Web Store — Bulk Email & WhatsApp Sender
+# Chrome Web Store — SendStack — Bulk Messaging
 
 ## Short Description (≤ 132 characters)
 
-> Send personalised bulk emails and WhatsApp messages from Gmail and WhatsApp Web — no server needed.
+> SendStack: Send personalised bulk emails and WhatsApp messages from Gmail and WhatsApp Web — no server needed.
 
-*(95 characters — within limit)*
+*(107 characters — within limit)*
 
 ---
 
 ## Detailed Description
 
-**Bulk Email & WhatsApp Sender** lets you reach hundreds of contacts straight from your browser — no backend, no API keys, no subscriptions.
+**SendStack — Bulk Messaging** lets you reach hundreds of contacts straight from your browser — no backend, no API keys, no subscriptions.
 
 ### Key Features
 
@@ -45,11 +45,10 @@ For WhatsApp, replace (or add) a `phone` column with international-format number
 
 | Permission | Why |
 |---|---|
-| `tabs` | Open new compose / WhatsApp tabs during bulk send |
-| `scripting` | Inject the panel UI into Gmail and WhatsApp Web |
 | `storage` | Save CSV data and settings locally |
 | `alarms` | Reset the daily send counter at midnight |
-| `activeTab` | Read the active tab URL to detect Gmail / WhatsApp Web |
+| `tabs` | Detect current site (Gmail/WhatsApp) in popup, open new tabs |
+| `notifications` | Alert user when a bulk send job halts due to errors |
 
 The extension does **not** read your email content or message history.
 
@@ -77,11 +76,11 @@ The extension does **not** read your email content or message history.
 
 | Asset | Size | Status |
 |---|---|---|
-| Store icon | 128 × 128 PNG | See `store/icon-128.png` |
-| Screenshot 1 — Gmail panel | 1280 × 800 PNG | See `store/screenshots/01-gmail-panel.png` |
-| Screenshot 2 — WhatsApp panel | 1280 × 800 PNG | See `store/screenshots/02-whatsapp-panel.png` |
-| Screenshot 3 — Options page | 1280 × 800 PNG | See `store/screenshots/03-options-page.png` |
-| Promotional tile | 440 × 280 PNG | See `store/promo-tile-440x280.png` |
+| Store icon | 128 × 128 PNG | `public/icons/icon128.png` |
+| Screenshot 1 — Email panel | 1280 × 800 PNG | `store/screenshots/01-gmail-panel.png` |
+| Screenshot 2 — WhatsApp panel | 1280 × 800 PNG | `store/screenshots/02-whatsapp-panel.png` |
+| Screenshot 3 — Options page | 1280 × 800 PNG | `store/screenshots/03-options-page.png` |
+| Screenshot 4 — Popup | 1280 × 800 PNG | `store/screenshots/04-popup.png` |
 
 > **Note:** Run `npm run build` in `chrome-extension/` to produce the `dist/` folder.  
 > Zip the `dist/` folder (`zip -r bulk-sender-extension.zip dist/`) to produce the upload artifact.  

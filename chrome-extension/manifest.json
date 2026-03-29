@@ -33,7 +33,7 @@
     }
   },
   "options_page": "options.html",
-  "permissions": ["storage", "alarms", "activeTab", "scripting", "notifications"],
+  "permissions": ["storage", "alarms", "tabs", "notifications"],
   "host_permissions": [
     "https://mail.google.com/*",
     "https://web.whatsapp.com/*"
