@@ -1,9 +1,30 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
+type SendEmailRequest = {
+  to?: string;
+  subject?: string;
+  html?: string;
+  fromEmail?: string;
+  smtpConfig?: {
+    host?: string;
+    port?: number | string;
+    user?: string;
+    pass?: string;
+    fromName?: string;
+  };
+};
+
+type RouteError = {
+  message?: string;
+  responseCode?: number;
+  code?: number | string;
+};
+
 export async function POST(request: Request) {
   try {
-    const { to, subject, html, smtpConfig, fromEmail } = await request.json();
+    const body = (await request.json()) as SendEmailRequest;
+    const { to, subject, html, smtpConfig, fromEmail } = body;
 
     if (!to || !subject || !html || !smtpConfig) {
       return NextResponse.json(
@@ -55,13 +76,14 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, messageId: info.messageId });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending email:', error);
 
     // Categorize error for better client-side messages
     let errorType = 'unknown';
-    const msg = error.message || '';
-    const code = error.responseCode || error.code || 0;
+    const err = (error && typeof error === 'object' ? error : {}) as RouteError;
+    const msg = err.message || '';
+    const code = err.responseCode || err.code || 0;
 
     if (msg.includes('Invalid login') || msg.includes('authentication') || code === 535) {
       errorType = 'auth';

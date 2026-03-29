@@ -23,7 +23,7 @@ export type ExtensionFixtures = {
 
 export const test = base.extend<ExtensionFixtures>({
   // Each test file gets its own isolated Chrome profile + extension instance.
-  context: async ({}, use) => {
+  context: async ({}, fixtureUse) => {
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-bulk-sender-'));
     const context = await chromium.launchPersistentContext(userDataDir, {
       headless: false,
@@ -34,17 +34,17 @@ export const test = base.extend<ExtensionFixtures>({
         '--disable-setuid-sandbox',
       ],
     });
-    await use(context);
+    await fixtureUse(context);
     await context.close();
     fs.rmSync(userDataDir, { recursive: true, force: true });
   },
 
-  extensionId: async ({ context }, use) => {
+  extensionId: async ({ context }, fixtureUse) => {
     // Wait for the service worker to register and extract the extension ID.
     let [sw] = context.serviceWorkers();
     if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
     const id = sw.url().split('/')[2];
-    await use(id);
+    await fixtureUse(id);
   },
 });
 

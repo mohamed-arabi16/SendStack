@@ -21,7 +21,6 @@ interface WAClientState {
 
 // Use globalThis to survive Next.js hot-reloads in development
 declare global {
-  // eslint-disable-next-line no-var
   var __waClientState: WAClientState | undefined;
 }
 
