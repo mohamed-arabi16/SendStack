@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Shield } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Shield, Menu, X } from 'lucide-react';
 import { useTranslation, LanguageSwitcher } from '../../i18n';
 
 export default function PrivacyPage() {
     const { t } = useTranslation();
+    const [navOpen, setNavOpen] = useState(false);
 
     return (
         <div className="page-wrapper">
@@ -16,9 +18,12 @@ export default function PrivacyPage() {
                             <img src="/logo.svg" alt="SendStack" width={32} height={32} />
                             <span className="nav-brand-text">SendStack</span>
                         </Link>
-                        <div className="nav-links">
+                        <button className="nav-toggle" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation">
+                            {navOpen ? <X size={22} /> : <Menu size={22} />}
+                        </button>
+                        <div className={`nav-links${navOpen ? ' nav-open' : ''}`}>
                             <LanguageSwitcher />
-                            <Link href="/" className="nav-link">
+                            <Link href="/" className="nav-link" onClick={() => setNavOpen(false)}>
                                 <ArrowLeft size={14} /> {t('nav.backToHome')}
                             </Link>
                         </div>

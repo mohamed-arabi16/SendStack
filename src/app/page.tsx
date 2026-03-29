@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import {
     Mail,
     Upload,
@@ -15,6 +16,8 @@ import {
     WifiOff,
     SlidersHorizontal,
     BarChart3,
+    Menu,
+    X,
 } from 'lucide-react';
 import HeroSection from '../components/HeroSection';
 import ScrollReveal from '../components/ScrollReveal';
@@ -22,6 +25,7 @@ import { useTranslation, LanguageSwitcher } from '../i18n';
 
 export default function LandingPage() {
     const { t } = useTranslation();
+    const [navOpen, setNavOpen] = useState(false);
 
     return (
         <div className="page-wrapper">
@@ -33,13 +37,20 @@ export default function LandingPage() {
                             <img src="/logo.svg" alt="SendStack" width={32} height={32} />
                             <span className="nav-brand-text">SendStack</span>
                         </Link>
-                        <div className="nav-links">
-                            <a href="#features" className="nav-link">{t('nav.features')}</a>
-                            <a href="#how-it-works" className="nav-link">{t('nav.howItWorks')}</a>
-                            <Link href="/about" className="nav-link">{t('nav.about')}</Link>
-                            <Link href="/faq" className="nav-link">{t('nav.faq')}</Link>
+                        <button
+                            className="nav-toggle"
+                            onClick={() => setNavOpen(!navOpen)}
+                            aria-label="Toggle navigation"
+                        >
+                            {navOpen ? <X size={22} /> : <Menu size={22} />}
+                        </button>
+                        <div className={`nav-links${navOpen ? ' nav-open' : ''}`}>
+                            <a href="#features" className="nav-link" onClick={() => setNavOpen(false)}>{t('nav.features')}</a>
+                            <a href="#how-it-works" className="nav-link" onClick={() => setNavOpen(false)}>{t('nav.howItWorks')}</a>
+                            <Link href="/about" className="nav-link" onClick={() => setNavOpen(false)}>{t('nav.about')}</Link>
+                            <Link href="/faq" className="nav-link" onClick={() => setNavOpen(false)}>{t('nav.faq')}</Link>
                             <LanguageSwitcher />
-                            <Link href="/dashboard" className="nav-cta-link">
+                            <Link href="/dashboard" className="nav-cta-link" onClick={() => setNavOpen(false)}>
                                 {t('nav.openApp')} <ArrowRight size={14} />
                             </Link>
                         </div>
