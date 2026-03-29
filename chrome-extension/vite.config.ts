@@ -20,6 +20,10 @@ export default defineConfig({
         ['popup.html', 'options.html', 'panel.html'].forEach(f => {
           if (existsSync(`public/${f}`)) copyFileSync(`public/${f}`, `dist/${f}`);
         });
+        // Copy WA-JS bridge files
+        ['wa-bridge.js', 'wppconnect-wa.js'].forEach(f => {
+          if (existsSync(`public/${f}`)) copyFileSync(`public/${f}`, `dist/${f}`);
+        });
       }
     },
     {

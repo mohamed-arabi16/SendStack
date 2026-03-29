@@ -43,7 +43,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["panel.html", "panel.js", "chunks/*"],
+      "resources": ["panel.html", "panel.js", "chunks/*", "wa-bridge.js", "wppconnect-wa.js"],
       "matches": ["https://mail.google.com/*", "https://web.whatsapp.com/*"]
     }
   ]

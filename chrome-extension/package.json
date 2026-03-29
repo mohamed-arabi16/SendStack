@@ -9,6 +9,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@wppconnect/wa-js": "^3.23.2",
     "dompurify": "^3.2.5",
     "papaparse": "^5.5.3",
     "react": "^19.1.0",
