@@ -232,10 +232,10 @@ export default function LandingPage() {
                             <Link href="/about">{t('nav.about')}</Link>
                             <Link href="/faq">{t('nav.faq')}</Link>
                             <Link href="/privacy">{t('footer.privacyPolicy')}</Link>
-                            <a href="https://github.com/mohamed-arabi16/Bulk-Email-sender" target="_blank" rel="noopener noreferrer">
+                            <a href="https://github.com/mohamed-arabi16/SendStack" target="_blank" rel="noopener noreferrer">
                                 {t('footer.sourceCode')}
                             </a>
-                            <a href="https://github.com/mohamed-arabi16/Bulk-Email-sender/issues" target="_blank" rel="noopener noreferrer">
+                            <a href="https://github.com/mohamed-arabi16/SendStack/issues" target="_blank" rel="noopener noreferrer">
                                 {t('footer.support')}
                             </a>
                         </div>

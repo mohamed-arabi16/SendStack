@@ -55,8 +55,8 @@ SendStack lets you send personalized bulk emails and WhatsApp messages to hundre
 
 ```bash
 # Clone
-git clone https://github.com/mohamed-arabi16/Bulk-Email-sender.git
-cd Bulk-Email-sender
+git clone https://github.com/mohamed-arabi16/SendStack.git
+cd SendStack
 
 # Install
 npm install
@@ -119,7 +119,7 @@ public/           # Static assets, robots.txt, llms.txt
 
 ## Contributing
 
-Issues and PRs welcome. Open an [issue](https://github.com/mohamed-arabi16/Bulk-Email-sender/issues) to report bugs or request features.
+Issues and PRs welcome. Open an [issue](https://github.com/mohamed-arabi16/SendStack/issues) to report bugs or request features.
 
 ## License
 

@@ -104,7 +104,7 @@ export default function FaqPage() {
                                 {t('faq.tryIt')} <ArrowRight size={14} />
                             </Link>
                             <a
-                                href="https://github.com/mohamed-arabi16/Bulk-Email-sender/issues"
+                                href="https://github.com/mohamed-arabi16/SendStack/issues"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="platform-cta"
@@ -126,7 +126,7 @@ export default function FaqPage() {
                             <Link href="/">{t('footer.home')}</Link>
                             <Link href="/about">{t('nav.about')}</Link>
                             <Link href="/privacy">{t('footer.privacyPolicy')}</Link>
-                            <a href="https://github.com/mohamed-arabi16/Bulk-Email-sender" target="_blank" rel="noopener noreferrer">
+                            <a href="https://github.com/mohamed-arabi16/SendStack" target="_blank" rel="noopener noreferrer">
                                 {t('footer.sourceCode')}
                             </a>
                         </div>

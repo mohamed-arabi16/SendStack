@@ -54,9 +54,9 @@ The extension does **not** read your email content or message history.
 
 ### Support & Source Code
 
-- **Support:** https://github.com/mohamed-arabi16/Bulk-Email-sender/issues
-- **Source:** https://github.com/mohamed-arabi16/Bulk-Email-sender
-- **Privacy Policy:** https://github.com/mohamed-arabi16/Bulk-Email-sender/blob/main/chrome-extension/store/privacy-policy.md
+- **Support:** https://github.com/mohamed-arabi16/SendStack/issues
+- **Source:** https://github.com/mohamed-arabi16/SendStack
+- **Privacy Policy:** https://github.com/mohamed-arabi16/SendStack/blob/main/chrome-extension/store/privacy-policy.md
 
 ---
 

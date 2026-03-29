@@ -102,8 +102,8 @@ export default function AboutPage() {
                         <h2>{t('about.openSourceTitle')}</h2>
                         <p>{t('about.openSourceDesc')}</p>
                         <p>
-                            <a href="https://github.com/mohamed-arabi16/Bulk-Email-sender" target="_blank" rel="noopener noreferrer" className="privacy-repo-link">
-                                <Github size={15} style={{ display: 'inline', verticalAlign: 'middle' }} /> github.com/mohamed-arabi16/Bulk-Email-sender
+                            <a href="https://github.com/mohamed-arabi16/SendStack" target="_blank" rel="noopener noreferrer" className="privacy-repo-link">
+                                <Github size={15} style={{ display: 'inline', verticalAlign: 'middle' }} /> github.com/mohamed-arabi16/SendStack
                             </a>
                         </p>
                     </section>
@@ -125,7 +125,7 @@ export default function AboutPage() {
                             <Link href="/">{t('footer.home')}</Link>
                             <Link href="/privacy">{t('footer.privacyPolicy')}</Link>
                             <Link href="/faq">{t('nav.faq')}</Link>
-                            <a href="https://github.com/mohamed-arabi16/Bulk-Email-sender" target="_blank" rel="noopener noreferrer">
+                            <a href="https://github.com/mohamed-arabi16/SendStack" target="_blank" rel="noopener noreferrer">
                                 {t('footer.sourceCode')}
                             </a>
                         </div>

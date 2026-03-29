@@ -169,6 +169,6 @@ The interface supports English, Arabic (with full RTL layout), and Turkish. Mess
 - **Homepage**: https://sender.qobouli.com
 - **Dashboard**: https://sender.qobouli.com/dashboard
 - **Privacy Policy**: https://sender.qobouli.com/privacy
-- **Source Code**: https://github.com/mohamed-arabi16/Bulk-Email-sender
-- **Report Issues**: https://github.com/mohamed-arabi16/Bulk-Email-sender/issues
+- **Source Code**: https://github.com/mohamed-arabi16/SendStack
+- **Report Issues**: https://github.com/mohamed-arabi16/SendStack/issues
 - **Built by**: Qobouli AI & Dev — https://qobouli.com

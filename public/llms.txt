@@ -27,7 +27,7 @@ SendStack lets you send personalized bulk emails and WhatsApp messages directly 
 ## Links
 - Homepage: https://sender.qobouli.com
 - Privacy Policy: https://sender.qobouli.com/privacy
-- Source Code: https://github.com/mohamed-arabi16/Bulk-Email-sender
+- Source Code: https://github.com/mohamed-arabi16/SendStack
 - Built by: https://qobouli.com (Qobouli AI & Dev)
 
 ## Technical

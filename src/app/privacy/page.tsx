@@ -131,12 +131,12 @@ export default function PrivacyPage() {
                         <p>{t('privacy.changesDesc')}</p>
                         <p>
                             <a
-                                href="https://github.com/mohamed-arabi16/Bulk-Email-sender/blob/main/chrome-extension/store/privacy-policy.md"
+                                href="https://github.com/mohamed-arabi16/SendStack/blob/main/chrome-extension/store/privacy-policy.md"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="privacy-repo-link"
                             >
-                                github.com/mohamed-arabi16/Bulk-Email-sender
+                                github.com/mohamed-arabi16/SendStack
                             </a>
                         </p>
                     </section>
@@ -146,12 +146,12 @@ export default function PrivacyPage() {
                         <p>{t('privacy.contactDesc')}</p>
                         <p>
                             <a
-                                href="https://github.com/mohamed-arabi16/Bulk-Email-sender/issues"
+                                href="https://github.com/mohamed-arabi16/SendStack/issues"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="privacy-repo-link"
                             >
-                                github.com/mohamed-arabi16/Bulk-Email-sender/issues
+                                github.com/mohamed-arabi16/SendStack/issues
                             </a>
                         </p>
                     </section>
@@ -166,7 +166,7 @@ export default function PrivacyPage() {
                         <div className="footer-links">
                             <Link href="/">{t('footer.home')}</Link>
                             <Link href="/dashboard">{t('footer.webApp')}</Link>
-                            <a href="https://github.com/mohamed-arabi16/Bulk-Email-sender" target="_blank" rel="noopener noreferrer">
+                            <a href="https://github.com/mohamed-arabi16/SendStack" target="_blank" rel="noopener noreferrer">
                                 {t('footer.sourceCode')}
                             </a>
                         </div>

@@ -65,7 +65,7 @@ The Extension is not directed at children under the age of 13.  We do not knowin
 
 We may update this Privacy Policy from time to time.  Any changes will be reflected in the "Last updated" date at the top of this document and will be committed to the public repository at:
 
-> https://github.com/mohamed-arabi16/Bulk-Email-sender/blob/main/chrome-extension/store/privacy-policy.md
+> https://github.com/mohamed-arabi16/SendStack/blob/main/chrome-extension/store/privacy-policy.md
 
 ---
 
@@ -73,4 +73,4 @@ We may update this Privacy Policy from time to time.  Any changes will be reflec
 
 If you have questions about this Privacy Policy or the Extension's data practices, please open an issue at:
 
-> https://github.com/mohamed-arabi16/Bulk-Email-sender/issues
+> https://github.com/mohamed-arabi16/SendStack/issues
