@@ -18,7 +18,9 @@ export interface WaJobState {
   currentIndex: number;
   sent: number;
   failed: number;
-  status: 'running' | 'cancelled' | 'completed';
+  status: 'running' | 'cancelled' | 'completed' | 'halted';
+  consecutiveFailures: number;
+  lastError: string;
 }
 
 let _activeWaJob: WaJobState | null = null;
@@ -29,24 +31,27 @@ async function storeWaJob(job: WaJobState): Promise<void> {
 }
 
 async function getActiveWaJob(): Promise<WaJobState | null> {
-  if (_activeWaJob?.status === 'running') return _activeWaJob;
+  if (_activeWaJob?.status === 'running' || _activeWaJob?.status === 'halted') return _activeWaJob;
   return new Promise((resolve) => {
     chrome.storage.local.get('activeWaJob', (result) => {
       const job = result['activeWaJob'] as WaJobState | undefined;
-      _activeWaJob = (job?.status === 'running') ? job : null;
+      _activeWaJob = (job?.status === 'running' || job?.status === 'halted') ? job : null;
       resolve(_activeWaJob);
     });
   });
 }
 
 async function advanceWaJob(
-  updates: { sent: number; failed: number }
+  updates: { sent: number; failed: number; consecutiveFailures?: number }
 ): Promise<{ nextIndex: number; status: WaJobState['status'] }> {
   const job = await getActiveWaJob();
   if (!job) return { nextIndex: -1, status: 'completed' };
   job.currentIndex++;
   job.sent = updates.sent;
   job.failed = updates.failed;
+  if (updates.consecutiveFailures !== undefined) {
+    job.consecutiveFailures = updates.consecutiveFailures;
+  }
   if (job.currentIndex >= job.contacts.length) job.status = 'completed';
   await storeWaJob(job);
   return { nextIndex: job.currentIndex, status: job.status };
@@ -148,6 +153,16 @@ async function handleMessage(message: { action: string; payload?: Record<string,
     case 'CANCEL_WA_JOB':
       await cancelWaJob();
       return { ok: true };
+    case 'FIRE_NOTIFICATION': {
+      const { title, message: msg } = message.payload as { title: string; message: string };
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: title ?? 'SendStack',
+        message: msg ?? 'An error occurred',
+      });
+      return { ok: true };
+    }
     default:
       return { error: `Unknown action: ${message.action}` };
   }
