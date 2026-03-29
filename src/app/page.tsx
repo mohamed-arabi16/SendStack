@@ -36,7 +36,8 @@ export default function LandingPage() {
                         <div className="nav-links">
                             <a href="#features" className="nav-link">{t('nav.features')}</a>
                             <a href="#how-it-works" className="nav-link">{t('nav.howItWorks')}</a>
-                            <Link href="/privacy" className="nav-link">{t('nav.privacy')}</Link>
+                            <Link href="/about" className="nav-link">{t('nav.about')}</Link>
+                            <Link href="/faq" className="nav-link">{t('nav.faq')}</Link>
                             <LanguageSwitcher />
                             <Link href="/dashboard" className="nav-cta-link">
                                 {t('nav.openApp')} <ArrowRight size={14} />
@@ -217,6 +218,8 @@ export default function LandingPage() {
                             <span>SendStack</span>
                         </div>
                         <div className="footer-links">
+                            <Link href="/about">{t('nav.about')}</Link>
+                            <Link href="/faq">{t('nav.faq')}</Link>
                             <Link href="/privacy">{t('footer.privacyPolicy')}</Link>
                             <a href="https://github.com/mohamed-arabi16/Bulk-Email-sender" target="_blank" rel="noopener noreferrer">
                                 {t('footer.sourceCode')}
