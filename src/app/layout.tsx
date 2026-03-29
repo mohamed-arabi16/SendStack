@@ -3,18 +3,18 @@ import "./globals.css";
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f5f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
   ],
 };
 
 export const metadata: Metadata = {
-  title: "Bulk Email Sender — CSV to Inbox",
+  title: "SendStack — Bulk Messaging Platform",
   description:
-    "Upload a CSV, personalize with template variables, and send bulk emails via SMTP. Supports Arabic & English, iCloud+, Gmail, and custom domains.",
-  keywords: ["email sender", "bulk email", "csv", "smtp", "icloud", "arabic"],
+    "Upload a CSV, personalize with template variables, and send bulk emails and WhatsApp messages. Supports Arabic & English, iCloud+, Gmail, and custom domains.",
+  keywords: ["sendstack", "bulk email", "whatsapp", "csv", "smtp", "messaging platform"],
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.svg",
   },
 };
 
