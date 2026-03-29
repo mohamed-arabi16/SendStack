@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Bulk Email & WhatsApp Sender",
+  "name": "SendStack — Bulk Messaging",
   "version": "1.0.0",
-  "description": "Send bulk emails and WhatsApp messages from Gmail and WhatsApp Web.",
+  "description": "SendStack: Send bulk emails and WhatsApp messages from Gmail and WhatsApp Web.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -40,5 +40,11 @@
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["panel.html", "panel.js", "chunks/*"],
+      "matches": ["https://mail.google.com/*", "https://web.whatsapp.com/*"]
+    }
+  ]
 }

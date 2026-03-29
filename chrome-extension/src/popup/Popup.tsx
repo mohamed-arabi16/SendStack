@@ -24,7 +24,7 @@ export default function Popup() {
 
   return (
     <div style={{ width: '280px', padding: '16px', fontFamily: 'sans-serif', fontSize: '13px' }}>
-      <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '12px' }}>📨 Bulk Sender</div>
+      <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '12px' }}>SendStack</div>
 
       {/* Site status */}
       <div style={{ background: '#f5f5f5', borderRadius: '6px', padding: '10px', marginBottom: '12px' }}>
