@@ -675,10 +675,14 @@ export default function EmailDashboard() {
             {/* Header */}
             <div className="dashboard-header">
                 <div className="header-icon">
-                    {mode === 'email' ? <Mail className="w-8 h-8" /> : <MessageCircle className="w-8 h-8" />}
+                    <svg width="28" height="28" viewBox="0 0 72 72" fill="none">
+                        <path d="M36 12L60 24L36 36L12 24L36 12Z" fill="#10b981" opacity="0.9"/>
+                        <path d="M60 32L36 44L12 32" stroke="#34d399" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M60 42L36 54L12 42" stroke="#6ee7b7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                 </div>
                 <div>
-                    <h1 className="header-title">Bulk {mode === 'email' ? 'Email' : 'WhatsApp'} Sender</h1>
+                    <h1 className="header-title">Send<span style={{ color: 'var(--accent)' }}>Stack</span></h1>
                     <p className="header-subtitle">Upload CSV · Personalize · Send</p>
                 </div>
                 <div className="ml-auto flex bg-gray-100 p-1 rounded-lg">
