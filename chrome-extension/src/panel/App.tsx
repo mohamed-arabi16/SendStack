@@ -27,6 +27,8 @@ export default function App() {
   const [mode, setMode] = useState<'email' | 'whatsapp'>(initialMode);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
+  const [phoneColumn, setPhoneColumn] = useState('');
+  const [emailColumn, setEmailColumn] = useState('');
   const [template, setTemplate] = useState('Hello {{Name}},\n\nYour message here.');
   const [subject, setSubject] = useState('');
   const [previewIdx, setPreviewIdx] = useState(0);
@@ -135,12 +137,27 @@ export default function App() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  function detectColumn(hdrs: string[], patterns: RegExp[]): string {
+    for (const h of hdrs) {
+      const lower = h.toLowerCase();
+      for (const p of patterns) {
+        if (p.test(lower) || p.test(h)) return h;
+      }
+    }
+    return '';
+  }
+
   const handleFileUpload = useCallback(async (file: File) => {
     try {
       const { headers: h, contacts: c } = await parseCSV(file);
       setHeaders(h);
       setContacts(c);
       setCsvWarning(c.length > 5000 ? `⚠️ ${c.length} contacts — approaching storage limit. Consider splitting the CSV.` : '');
+      // Auto-detect phone and email columns
+      const phonePat = [/phone/i, /واتساب/, /whatsapp/i, /mobile/i, /tel/i, /رقم/];
+      const emailPat = [/email/i, /بريد/, /mail/i];
+      setPhoneColumn(detectColumn(h, phonePat));
+      setEmailColumn(detectColumn(h, emailPat));
       await saveContactsToStorage(c);
     } catch (err) {
       setErrorBanner('Failed to parse CSV: ' + String(err));
@@ -153,6 +170,15 @@ export default function App() {
     if (file) handleFileUpload(file);
   }, [handleFileUpload]);
 
+  function mapContacts(raw: Contact[]): Contact[] {
+    return raw.map(c => {
+      const mapped = { ...c };
+      if (phoneColumn && phoneColumn !== 'phone') mapped.phone = c[phoneColumn] ?? '';
+      if (emailColumn && emailColumn !== 'email') mapped.email = c[emailColumn] ?? '';
+      return mapped;
+    });
+  }
+
   const resolvedPreview = contacts.length > 0
     ? resolveSpin(resolveTemplate(template, contacts[previewIdx] ?? {}))
     : template;
@@ -163,16 +189,19 @@ export default function App() {
   function startJob() {
     if (contacts.length === 0) { setErrorBanner('Please upload a CSV first.'); return; }
     if (mode === 'email' && !subject) { setErrorBanner('Please enter a subject line.'); return; }
+    if (mode === 'email' && !emailColumn) { setErrorBanner('Please select which column contains email addresses.'); return; }
+    if (mode === 'whatsapp' && !phoneColumn) { setErrorBanner('Please select which column contains phone numbers.'); return; }
     setErrorBanner('');
     setStatus('sending');
     setLogs([]);
     setSummary(null);
     setProgress({ current: 0, total: contacts.length, sent: 0, failed: 0 });
 
+    const mapped = mapContacts(contacts);
     if (mode === 'email') {
-      window.parent.postMessage({ type: 'START_EMAIL_JOB', contacts, template, subject, settings }, '*');
+      window.parent.postMessage({ type: 'START_EMAIL_JOB', contacts: mapped, template, subject, settings }, '*');
     } else {
-      window.parent.postMessage({ type: 'START_WA_JOB', contacts, template, settings }, '*');
+      window.parent.postMessage({ type: 'START_WA_JOB', contacts: mapped, template, settings }, '*');
     }
   }
 
@@ -283,6 +312,26 @@ export default function App() {
           </div>
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]); }} />
           {csvWarning && <div style={{ color: '#ff9f0a', fontSize: '12px', marginTop: '4px' }}>{csvWarning}</div>}
+          {/* Column mapping */}
+          {headers.length > 0 && (
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+              {(mode === 'whatsapp' || mode === 'email') && (
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '11px', color: '#71717a', display: 'block', marginBottom: '2px' }}>
+                    {mode === 'whatsapp' ? 'Phone column' : 'Email column'}
+                  </label>
+                  <select
+                    value={mode === 'whatsapp' ? phoneColumn : emailColumn}
+                    onChange={(e) => mode === 'whatsapp' ? setPhoneColumn(e.target.value) : setEmailColumn(e.target.value)}
+                    style={{ width: '100%', padding: '4px', background: '#171717', color: '#fafafa', border: '1px solid #262626', borderRadius: '4px', fontSize: '12px' }}
+                  >
+                    <option value="">— Select —</option>
+                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Template Editor */}
