@@ -39,3 +39,5 @@ next-env.d.ts
 # Chrome extension build artifacts
 chrome-extension/node_modules/
 chrome-extension/dist/
+chrome-extension/test-results/
+chrome-extension/playwright-report/
