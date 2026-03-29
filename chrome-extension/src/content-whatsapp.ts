@@ -3,46 +3,43 @@ import type { Contact } from './lib/csv-parser';
 import { sendToBackground } from './lib/messaging';
 import type { ExtensionSettings } from './lib/storage';
 import type { WaJobState } from './background';
+import { findElement, findSelector, runPreflight, SelectorError, WHATSAPP_SELECTORS } from './lib/selectors';
+import { CIRCUIT_BREAKER_THRESHOLD, RETRY_ATTEMPTS, RETRY_BACKOFF_MS, isRetryableError } from './lib/circuit-breaker';
 
 let panelVisible = false;
 let shadowHost: HTMLDivElement | null = null;
+let panelIframe: HTMLIFrameElement | null = null;
 
-function waitForElement(selector: string, timeout = 15000): Promise<Element> {
-  return new Promise((resolve, reject) => {
-    const el = document.querySelector(selector);
-    if (el) { resolve(el); return; }
-    const observer = new MutationObserver(() => {
-      const found = document.querySelector(selector);
-      if (found) { observer.disconnect(); resolve(found); }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => { observer.disconnect(); reject(new Error(`Timeout waiting for ${selector}`)); }, timeout);
-  });
+function notifyError(message: string) {
+  sendToBackground('FIRE_NOTIFICATION', { title: 'SendStack', message }).catch(() => {});
+}
+
+function postToPanel(data: Record<string, unknown>) {
+  panelIframe?.contentWindow?.postMessage(data, '*');
 }
 
 async function injectPanel() {
-  // If we are on a /send?phone=... page, resume the active bulk job and skip panel setup.
   if (window.location.search.includes('phone=')) {
     await processCurrentContact();
     return;
   }
 
-  // ---- Normal main-page panel injection ----
+  // Wait for WhatsApp to load (non-blocking — inject panel regardless)
   try {
-    await waitForElement('#pane-side', 20000);
+    await findElement(findSelector('CHAT_LIST', WHATSAPP_SELECTORS), 20000);
   } catch {
-    console.warn('[BulkSender] WhatsApp chat list not found, injecting anyway');
+    // Will be caught by pre-flight check in panel
   }
 
   // Floating toggle button
   const toggleBtn = document.createElement('button');
   toggleBtn.id = 'bulk-sender-toggle';
-  toggleBtn.textContent = 'SendStack';
+  toggleBtn.textContent = '\uD83D\uDCAC Bulk Sender';
   toggleBtn.style.cssText = [
     'position:fixed', 'right:0', 'top:50%', 'transform:translateY(-50%)',
-    'z-index:99999', 'background:#10b981', 'color:#fff', 'border:none',
+    'z-index:99999', 'background:#25d366', 'color:#fff', 'border:none',
     'border-radius:8px 0 0 8px', 'padding:12px 10px', 'cursor:pointer',
-    'font-size:13px', 'font-family:-apple-system,BlinkMacSystemFont,sans-serif', 'writing-mode:vertical-rl',
+    'font-size:13px', 'font-family:sans-serif', 'writing-mode:vertical-rl',
     'text-orientation:mixed', 'box-shadow:-2px 0 8px rgba(0,0,0,0.2)',
   ].join(';');
   toggleBtn.addEventListener('click', togglePanel);
@@ -61,7 +58,9 @@ async function injectPanel() {
   const iframe = document.createElement('iframe');
   iframe.src = chrome.runtime.getURL('panel.html') + '?mode=whatsapp';
   iframe.style.cssText = 'width:100%;height:100%;border:none;';
+  iframe.onerror = () => notifyError('Panel failed to load on WhatsApp Web');
   shadowRoot.appendChild(iframe);
+  panelIframe = iframe;
 
   window.addEventListener('message', handlePanelMessage);
 }
@@ -71,6 +70,22 @@ function togglePanel() {
   if (shadowHost) {
     shadowHost.style.display = panelVisible ? 'block' : 'none';
   }
+}
+
+// ---- Retry wrapper ----
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (!isRetryableError(err) || attempt === RETRY_ATTEMPTS) throw err;
+      await sleep(RETRY_BACKOFF_MS);
+    }
+  }
+  throw lastError;
 }
 
 // ---- Process the current contact on a /send?phone=... page ----
@@ -86,17 +101,14 @@ async function processCurrentContact(): Promise<void> {
   const total = job.contacts.length;
   let sent = job.sent;
   let failed = job.failed;
+  let consecutiveFailures = job.consecutiveFailures ?? 0;
 
   // Enforce daily limit
   const { sent: dailySent, limit: dailyLimit } =
     await sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT');
   if (dailySent >= dailyLimit) {
-    window.postMessage({
-      type: 'BULK_SENDER_PROGRESS', current: job.currentIndex + 1, total,
-      sent, failed, status: 'skipped', recipient: phone, error: 'Daily limit reached',
-    }, '*');
     await sendToBackground('CANCEL_WA_JOB', {});
-    window.postMessage({ type: 'BULK_SENDER_COMPLETE', sent, failed, skipped: total - job.currentIndex }, '*');
+    notifyError(`Daily limit reached (${dailyLimit}). Job stopped after ${sent} sent.`);
     return;
   }
 
@@ -104,34 +116,38 @@ async function processCurrentContact(): Promise<void> {
   if (job.settings.spinSyntaxEnabled) resolvedMsg = resolveSpin(resolvedMsg);
 
   try {
-    await doSendOnCurrentPage(phone, resolvedMsg);
+    await withRetry(() => doSendOnCurrentPage(phone, resolvedMsg));
     sent++;
+    consecutiveFailures = 0;
     await sendToBackground('INCREMENT_COUNT', { n: 1 });
-    window.postMessage({
-      type: 'BULK_SENDER_PROGRESS', current: job.currentIndex + 1, total,
-      sent, failed, status: 'success', recipient: phone,
-    }, '*');
   } catch (err) {
     failed++;
-    window.postMessage({
-      type: 'BULK_SENDER_PROGRESS', current: job.currentIndex + 1, total,
-      sent, failed, status: 'error', recipient: phone, error: String(err),
-    }, '*');
+    consecutiveFailures++;
+
+    // Circuit breaker check
+    if (consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+      const errorMsg = err instanceof SelectorError
+        ? `${err.selectorName} not found — WhatsApp may have changed its UI`
+        : String(err);
+      const haltedJob: WaJobState = {
+        ...job, sent, failed, consecutiveFailures,
+        status: 'halted', lastError: errorMsg,
+      };
+      await sendToBackground('STORE_WA_JOB', haltedJob as unknown as Record<string, unknown>);
+      notifyError(`Job halted after ${sent}/${total} — ${errorMsg}`);
+      return;
+    }
   }
 
   // Advance job in background
   const { nextIndex, status } =
-    await sendToBackground<{ nextIndex: number; status: WaJobState['status'] }>('ADVANCE_WA_JOB', { sent, failed });
+    await sendToBackground<{ nextIndex: number; status: WaJobState['status'] }>('ADVANCE_WA_JOB', { sent, failed, consecutiveFailures });
 
-  if (status === 'completed' || status === 'cancelled') {
-    window.postMessage({ type: 'BULK_SENDER_COMPLETE', sent, failed, skipped: total - sent - failed }, '*');
-    return;
-  }
+  if (status === 'completed' || status === 'cancelled') return;
 
   // Inter-message delay
   const batchSize = job.settings.batchSize;
   if (nextIndex % batchSize === 0) {
-    window.postMessage({ type: 'BULK_SENDER_COOLDOWN', seconds: job.settings.cooldownSeconds }, '*');
     await sleep(job.settings.cooldownSeconds * 1000);
   } else {
     const delayMap: Record<string, number> = { fast: 5000, normal: 10000, safe: 15000 };
@@ -153,12 +169,16 @@ async function processCurrentContact(): Promise<void> {
 // ---- WhatsApp send interaction on the current page ----
 
 async function doSendOnCurrentPage(phone: string, message: string): Promise<void> {
-  const input = await waitForElement('footer [contenteditable="true"]', 20000) as HTMLElement;
+  const msgInputDef = findSelector('MSG_INPUT', WHATSAPP_SELECTORS);
+  const input = await findElement(msgInputDef, 20000) as HTMLElement;
 
   await sleep(1000);
-  const invalidMsg = document.querySelector('[data-testid="intro-text"]');
-  if (invalidMsg?.textContent?.includes('Phone number shared via url is invalid')) {
-    throw new Error(`Phone ${phone} is not on WhatsApp`);
+  const invalidPhoneDef = findSelector('INVALID_PHONE', WHATSAPP_SELECTORS);
+  for (const sel of invalidPhoneDef.selectors) {
+    const invalidMsg = document.querySelector(sel);
+    if (invalidMsg?.textContent?.includes('Phone number shared via url is invalid')) {
+      throw new Error(`Phone ${phone} is not on WhatsApp`);
+    }
   }
 
   input.focus();
@@ -166,9 +186,14 @@ async function doSendOnCurrentPage(phone: string, message: string): Promise<void
   input.dispatchEvent(new Event('input', { bubbles: true }));
   await sleep(300);
 
-  const sendBtn = document.querySelector('[data-testid="send"], [aria-label="Send"]') as HTMLElement | null;
+  const sendBtnDef = findSelector('SEND_BUTTON', WHATSAPP_SELECTORS);
+  let sendBtn: Element | null = null;
+  for (const sel of sendBtnDef.selectors) {
+    sendBtn = document.querySelector(sel);
+    if (sendBtn) break;
+  }
   if (sendBtn) {
-    sendBtn.click();
+    (sendBtn as HTMLElement).click();
   } else {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   }
@@ -178,17 +203,22 @@ async function doSendOnCurrentPage(phone: string, message: string): Promise<void
 
 // ---- Panel message handler (main page only) ----
 
-function handlePanelMessage(event: MessageEvent) {
+async function handlePanelMessage(event: MessageEvent) {
   const data = event.data as { type: string; [key: string]: unknown };
   if (!data || !data.type) return;
 
-  if (data.type === 'START_WA_JOB') {
+  if (data.type === 'PREFLIGHT_CHECK') {
+    const result = await runPreflight(WHATSAPP_SELECTORS);
+    postToPanel({ type: 'PREFLIGHT_RESULT', ...result });
+  } else if (data.type === 'START_WA_JOB') {
     const { contacts, template, settings } = data as unknown as {
       contacts: Contact[]; template: string; settings: ExtensionSettings;
     };
-    startWaJob(contacts, template, settings).catch(console.error);
+    startWaJob(contacts, template, settings).catch((err) => {
+      postToPanel({ type: 'JOB_START_ERROR', error: String(err) });
+    });
   } else if (data.type === 'CANCEL_JOB') {
-    sendToBackground('CANCEL_WA_JOB', {}).catch(console.error);
+    sendToBackground('CANCEL_WA_JOB', {}).catch((err) => notifyError(String(err)));
   }
 }
 
@@ -197,14 +227,14 @@ async function startWaJob(contacts: Contact[], template: string, settings: Exten
   const job: WaJobState = {
     jobId, contacts, template, settings,
     currentIndex: 0, sent: 0, failed: 0, status: 'running',
+    consecutiveFailures: 0, lastError: '',
   };
   await sendToBackground('STORE_WA_JOB', job as unknown as Record<string, unknown>);
 
-  // Navigate to the first contact's send URL
   const firstPhone = contacts[0]?.phone?.replace(/[\s\-+]/g, '') ?? '';
   if (firstPhone) {
     window.location.href = `https://web.whatsapp.com/send?phone=${firstPhone}`;
   }
 }
 
-injectPanel().catch(console.error);
+injectPanel().catch((err) => notifyError(`Failed to load on WhatsApp Web: ${String(err)}`));
