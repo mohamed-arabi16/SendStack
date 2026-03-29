@@ -6,7 +6,7 @@ export default function Popup() {
   const [currentSite, setCurrentSite] = useState<'gmail' | 'whatsapp' | 'other'>('other');
 
   useEffect(() => {
-    sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT').then(setDailyCount).catch(console.error);
+    sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT').then(setDailyCount).catch(() => {});
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       try {
         const parsed = new URL(tabs[0]?.url ?? '');

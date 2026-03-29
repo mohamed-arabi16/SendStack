@@ -9,7 +9,7 @@ export default function Options() {
   const [validationErrors, setValidationErrors] = useState<{ delay?: string; batchSize?: string }>({});
 
   useEffect(() => {
-    sendToBackground<ExtensionSettings>('GET_SETTINGS').then(setSettings).catch(console.error);
+    sendToBackground<ExtensionSettings>('GET_SETTINGS').then(setSettings).catch(() => {});
   }, []);
 
   async function handleSave() {
