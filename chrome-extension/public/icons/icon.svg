@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <rect width="128" height="128" rx="16" fill="#0a0a0a"/>
+  <!-- Top layer (filled diamond) -->
+  <path d="M64 24L112 48L64 72L16 48L64 24Z" fill="#10b981"/>
+  <!-- Middle layer (filled band) -->
+  <path d="M16 56L64 80L112 56L112 64L64 88L16 64Z" fill="#34d399"/>
+  <!-- Bottom layer (filled band) -->
+  <path d="M16 72L64 96L112 72L112 80L64 104L16 80Z" fill="#6ee7b7"/>
+</svg>
