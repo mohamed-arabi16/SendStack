@@ -44,7 +44,7 @@ export default function Popup() {
 
       {/* Daily stats */}
       <div style={{ background: '#f5f5f5', borderRadius: '6px', padding: '10px', marginBottom: '12px' }}>
-        <div style={{ fontWeight: 600, marginBottom: '4px' }}>📊 Today's Usage</div>
+        <div style={{ fontWeight: 600, marginBottom: '4px' }}>📊 Today&apos;s Usage</div>
         <div style={{ background: '#e0e0e0', borderRadius: '4px', overflow: 'hidden', height: '6px', marginBottom: '4px' }}>
           <div style={{ height: '100%', background: '#1a73e8', width: `${Math.min(100, (dailyCount.sent / dailyCount.limit) * 100)}%` }} />
         </div>

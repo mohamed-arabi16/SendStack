@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   description:
     "Upload a CSV, personalize with template variables, and send bulk emails via SMTP. Supports Arabic & English, iCloud+, Gmail, and custom domains.",
   keywords: ["email sender", "bulk email", "csv", "smtp", "icloud", "arabic"],
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -22,14 +25,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body>
         {children}
       </body>

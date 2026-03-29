@@ -39,10 +39,6 @@ test.describe('Daily limit enforcement', () => {
     // Wait for the content script to inject the toggle button
     await page.waitForSelector('#bulk-sender-toggle', { timeout: 15000 });
 
-    // Collect progress events from the content script
-    const progress: { status: string; recipient: string }[] = [];
-    let complete: { sent: number; failed: number; skipped: number } | null = null;
-
     await page.evaluate(() => {
       window.addEventListener('message', (e) => {
         const d = e.data as { type: string };

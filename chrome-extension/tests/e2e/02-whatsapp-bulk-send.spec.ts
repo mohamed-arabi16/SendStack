@@ -13,7 +13,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { test, expect, setStorage, clearStorage, FAST_SETTINGS } from './fixtures';
+import { test, expect, clearStorage, FAST_SETTINGS } from './fixtures';
 
 const MOCK_WA_MAIN = path.resolve(__dirname, 'mock-pages/whatsapp.html');
 const MOCK_WA_SEND = path.resolve(__dirname, 'mock-pages/whatsapp-send.html');
