@@ -4,16 +4,25 @@
  * then provides openChat() which communicates via postMessage.
  */
 
+const ORIGIN = 'https://web.whatsapp.com';
+
 let bridgeReady = false;
 let bridgeFailed = false;
 let bridgeError = '';
+let bridgeInitStarted = false;
 let requestId = 0;
 
 /**
  * Inject the WA-JS bridge into WhatsApp Web's main world.
  * Returns true if the bridge initialized successfully.
+ * Idempotent — safe to call multiple times.
  */
 export async function initBridge(): Promise<boolean> {
+  if (bridgeReady) return true;
+  if (bridgeFailed) return false;
+  if (bridgeInitStarted) return false; // prevent double init
+  bridgeInitStarted = true;
+
   // Inject the bridge script into the page's main world
   const bridgeScript = document.createElement('script');
   bridgeScript.src = chrome.runtime.getURL('wa-bridge.js');
@@ -22,22 +31,24 @@ export async function initBridge(): Promise<boolean> {
   // Wait for bridge script to load
   await new Promise<void>((resolve) => {
     bridgeScript.onload = () => resolve();
-    bridgeScript.onerror = () => resolve(); // will fail on WA_INIT
+    bridgeScript.onerror = () => resolve();
   });
 
-  // Tell the bridge to load WA-JS
+  // Tell the bridge to load WA-JS (only accept chrome-extension:// URLs)
   const waJsUrl = chrome.runtime.getURL('wppconnect-wa.js');
-  window.postMessage({ type: 'WA_INIT', waJsUrl }, '*');
+  window.postMessage({ type: 'WA_INIT', waJsUrl }, ORIGIN);
 
   // Wait for bridge ready/failed (up to 35 seconds)
   return new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => {
+      window.removeEventListener('message', onMessage);
       bridgeFailed = true;
       bridgeError = 'Bridge initialization timeout';
       resolve(false);
     }, 35000);
 
     function onMessage(event: MessageEvent) {
+      if (event.origin !== ORIGIN) return;
       if (event.data?.type === 'WA_BRIDGE_READY') {
         clearTimeout(timeout);
         window.removeEventListener('message', onMessage);
@@ -67,7 +78,7 @@ export async function openChat(phone: string): Promise<void> {
     throw new Error(bridgeFailed ? `WA-JS bridge failed: ${bridgeError}` : 'WA-JS bridge not initialized');
   }
 
-  const id = ++requestId;
+  const id = `req-${++requestId}-${Date.now()}`;
 
   return new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -76,6 +87,7 @@ export async function openChat(phone: string): Promise<void> {
     }, 10000);
 
     function onMessage(event: MessageEvent) {
+      if (event.origin !== ORIGIN) return;
       if (event.data?.type === 'WA_CHAT_RESULT' && event.data?.id === id) {
         clearTimeout(timeout);
         window.removeEventListener('message', onMessage);
@@ -88,7 +100,7 @@ export async function openChat(phone: string): Promise<void> {
     }
 
     window.addEventListener('message', onMessage);
-    window.postMessage({ type: 'WA_OPEN_CHAT', phone, id }, '*');
+    window.postMessage({ type: 'WA_OPEN_CHAT', phone, id }, ORIGIN);
   });
 }
 

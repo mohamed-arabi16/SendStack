@@ -11,25 +11,30 @@ let panelVisible = false;
 let shadowHost: HTMLDivElement | null = null;
 let panelIframe: HTMLIFrameElement | null = null;
 let cancelRequested = false;
+let jobRunning = false;
+let injected = false;
+
+const PANEL_ORIGIN = chrome.runtime.getURL('').slice(0, -1); // chrome-extension://ID
 
 function notifyError(message: string) {
   sendToBackground('FIRE_NOTIFICATION', { title: 'SendStack', message }).catch(() => {});
 }
 
 function postToPanel(data: Record<string, unknown>) {
-  panelIframe?.contentWindow?.postMessage(data, '*');
+  panelIframe?.contentWindow?.postMessage(data, PANEL_ORIGIN);
 }
 
 function postProgress(current: number, total: number, sent: number, failed: number, status: string, recipient: string, error?: string) {
-  window.postMessage({ type: 'BULK_SENDER_PROGRESS', current, total, sent, failed, status, recipient, error }, '*');
+  // Route directly to panel instead of broadcasting on window
+  postToPanel({ type: 'BULK_SENDER_PROGRESS', current, total, sent, failed, status, recipient, error });
 }
 
 function postCooldown(seconds: number) {
-  window.postMessage({ type: 'BULK_SENDER_COOLDOWN', seconds }, '*');
+  postToPanel({ type: 'BULK_SENDER_COOLDOWN', seconds });
 }
 
 function postJobComplete(sent: number, failed: number, skipped: number, halted?: boolean, error?: string) {
-  window.postMessage({ type: 'BULK_SENDER_COMPLETE', sent, failed, skipped, halted, error }, '*');
+  postToPanel({ type: 'BULK_SENDER_COMPLETE', sent, failed, skipped, halted, error });
 }
 
 // ---- Retry wrapper ----
@@ -51,6 +56,10 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 // ---- Panel injection ----
 
 async function injectPanel() {
+  // Guard against double injection
+  if (injected) return;
+  injected = true;
+
   // Wait for WhatsApp to load (non-blocking)
   try {
     await findElement(findSelector('CHAT_LIST', WHATSAPP_SELECTORS), 20000);
@@ -101,15 +110,6 @@ async function injectPanel() {
   // Listen for messages from panel
   window.addEventListener('message', handlePanelMessage);
 
-  // Forward progress messages to the panel iframe
-  window.addEventListener('message', (event) => {
-    const data = event.data as { type?: string };
-    if (!data?.type) return;
-    if (data.type === 'BULK_SENDER_PROGRESS' || data.type === 'BULK_SENDER_COOLDOWN' || data.type === 'BULK_SENDER_COMPLETE') {
-      postToPanel(event.data as Record<string, unknown>);
-    }
-  });
-
   // Handle legacy URL-based flow (?phone= in URL)
   if (window.location.search.includes('phone=')) {
     await processCurrentContact();
@@ -123,12 +123,12 @@ function togglePanel() {
   }
 }
 
-// ---- NEW: In-page job loop (no reload) ----
+// ---- In-page job loop (no reload) ----
 
 async function runWaJob(contacts: Contact[], template: string, settings: ExtensionSettings): Promise<void> {
   cancelRequested = false;
   const total = contacts.length;
-  let sent = 0, failed = 0, consecutiveFailures = 0;
+  let sent = 0, failed = 0, skipped = 0, consecutiveFailures = 0;
 
   const delayMap: Record<string, number> = { fast: 5000, normal: 10000, safe: 15000 };
   const baseDelay = settings.delayPreset === 'custom'
@@ -145,13 +145,13 @@ async function runWaJob(contacts: Contact[], template: string, settings: Extensi
     const { sent: dailySent, limit: dailyLimit } =
       await sendToBackground<{ sent: number; limit: number }>('GET_DAILY_COUNT');
     if (dailySent >= dailyLimit) {
-      failed++;
+      skipped++;
       postProgress(i + 1, total, sent, failed, 'skipped', phone, 'Daily limit reached');
       break;
     }
 
     if (!phone) {
-      failed++;
+      skipped++;
       postProgress(i + 1, total, sent, failed, 'skipped', phone, 'No phone number');
       continue;
     }
@@ -179,7 +179,7 @@ async function runWaJob(contacts: Contact[], template: string, settings: Extensi
         const errorMsg = err instanceof SelectorError
           ? `${err.selectorName} not found — WhatsApp UI may have changed`
           : String(err);
-        postJobComplete(sent, failed, total - sent - failed, true,
+        postJobComplete(sent, failed, total - sent - failed - skipped, true,
           `Job halted — ${consecutiveFailures} consecutive failures. Last error: ${errorMsg}`);
         notifyError(`Job halted after ${sent}/${total} — ${errorMsg}`);
         return;
@@ -196,7 +196,7 @@ async function runWaJob(contacts: Contact[], template: string, settings: Extensi
     }
   }
 
-  postJobComplete(sent, failed, total - sent - failed);
+  postJobComplete(sent, failed, total - sent - failed - skipped);
 }
 
 // ---- Send message in already-open chat (DOM automation) ----
@@ -207,7 +207,12 @@ async function doSendInOpenChat(message: string): Promise<void> {
 
   input.focus();
   document.execCommand('insertText', false, message);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new InputEvent('input', {
+    inputType: 'insertText',
+    data: message,
+    bubbles: true,
+    cancelable: true,
+  }));
   await sleep(300);
 
   const sendBtnDef = findSelector('SEND_BUTTON', WHATSAPP_SELECTORS);
@@ -313,7 +318,12 @@ async function doSendOnLegacyPage(phone: string, message: string): Promise<void>
 
   input.focus();
   document.execCommand('insertText', false, message);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new InputEvent('input', {
+    inputType: 'insertText',
+    data: message,
+    bubbles: true,
+    cancelable: true,
+  }));
   await sleep(300);
 
   const sendBtnDef = findSelector('SEND_BUTTON', WHATSAPP_SELECTORS);
@@ -341,22 +351,25 @@ async function handlePanelMessage(event: MessageEvent) {
     const result = await runPreflight(WHATSAPP_SELECTORS);
     postToPanel({ type: 'PREFLIGHT_RESULT', ...result });
   } else if (data.type === 'START_WA_JOB') {
+    // Guard against concurrent jobs
+    if (jobRunning) {
+      postToPanel({ type: 'JOB_START_ERROR', error: 'A job is already running' });
+      return;
+    }
+    jobRunning = true;
+
     const { contacts, template, settings } = data as unknown as {
       contacts: Contact[]; template: string; settings: ExtensionSettings;
     };
 
-    if (isBridgeReady()) {
-      // Use no-reload in-page loop
-      runWaJob(contacts, template, settings).catch((err) => {
-        postToPanel({ type: 'JOB_START_ERROR', error: String(err) });
-      });
-    } else {
-      // Fall back to legacy URL navigation
-      console.log('[SendStack] WA-JS not available, using URL navigation fallback');
-      startLegacyJob(contacts, template, settings).catch((err) => {
-        postToPanel({ type: 'JOB_START_ERROR', error: String(err) });
-      });
-    }
+    const run = isBridgeReady()
+      ? runWaJob(contacts, template, settings)
+      : (console.log('[SendStack] WA-JS not available, using URL navigation fallback'),
+         startLegacyJob(contacts, template, settings));
+
+    run
+      .catch((err) => postToPanel({ type: 'JOB_START_ERROR', error: String(err) }))
+      .finally(() => { jobRunning = false; });
   } else if (data.type === 'CANCEL_JOB') {
     cancelRequested = true;
     sendToBackground('CANCEL_WA_JOB', {}).catch((err) => notifyError(String(err)));
