@@ -29,6 +29,7 @@ export default function App() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [phoneColumn, setPhoneColumn] = useState('');
   const [emailColumn, setEmailColumn] = useState('');
+  const [nameColumn, setNameColumn] = useState('');
   const [template, setTemplate] = useState('Hello {{Name}},\n\nYour message here.');
   const [subject, setSubject] = useState('');
   const [previewIdx, setPreviewIdx] = useState(0);
@@ -153,11 +154,13 @@ export default function App() {
       setHeaders(h);
       setContacts(c);
       setCsvWarning(c.length > 5000 ? `⚠️ ${c.length} contacts — approaching storage limit. Consider splitting the CSV.` : '');
-      // Auto-detect phone and email columns
+      // Auto-detect phone, email, and name columns
       const phonePat = [/phone/i, /واتساب/, /whatsapp/i, /mobile/i, /tel/i, /رقم/];
       const emailPat = [/email/i, /بريد/, /mail/i];
+      const namePat = [/^name$/i, /اسم/, /full.?name/i, /first.?name/i, /الاسم/];
       setPhoneColumn(detectColumn(h, phonePat));
       setEmailColumn(detectColumn(h, emailPat));
+      setNameColumn(detectColumn(h, namePat));
       await saveContactsToStorage(c);
     } catch (err) {
       setErrorBanner('Failed to parse CSV: ' + String(err));
@@ -175,6 +178,7 @@ export default function App() {
       const mapped = { ...c };
       if (phoneColumn && phoneColumn !== 'phone') mapped.phone = c[phoneColumn] ?? '';
       if (emailColumn && emailColumn !== 'email') mapped.email = c[emailColumn] ?? '';
+      if (nameColumn && nameColumn !== 'Name') mapped.Name = c[nameColumn] ?? '';
       return mapped;
     });
   }
@@ -314,22 +318,31 @@ export default function App() {
           {csvWarning && <div style={{ color: '#ff9f0a', fontSize: '12px', marginTop: '4px' }}>{csvWarning}</div>}
           {/* Column mapping */}
           {headers.length > 0 && (
-            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
-              {(mode === 'whatsapp' || mode === 'email') && (
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '11px', color: '#71717a', display: 'block', marginBottom: '2px' }}>
-                    {mode === 'whatsapp' ? 'Phone column' : 'Email column'}
-                  </label>
-                  <select
-                    value={mode === 'whatsapp' ? phoneColumn : emailColumn}
-                    onChange={(e) => mode === 'whatsapp' ? setPhoneColumn(e.target.value) : setEmailColumn(e.target.value)}
-                    style={{ width: '100%', padding: '4px', background: '#171717', color: '#fafafa', border: '1px solid #262626', borderRadius: '4px', fontSize: '12px' }}
-                  >
-                    <option value="">— Select —</option>
-                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
-                </div>
-              )}
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '120px' }}>
+                <label style={{ fontSize: '11px', color: '#71717a', display: 'block', marginBottom: '2px' }}>Name column</label>
+                <select
+                  value={nameColumn}
+                  onChange={(e) => setNameColumn(e.target.value)}
+                  style={{ width: '100%', padding: '4px', background: '#171717', color: '#fafafa', border: '1px solid #262626', borderRadius: '4px', fontSize: '12px' }}
+                >
+                  <option value="">— Select —</option>
+                  {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: '120px' }}>
+                <label style={{ fontSize: '11px', color: '#71717a', display: 'block', marginBottom: '2px' }}>
+                  {mode === 'whatsapp' ? 'Phone column' : 'Email column'}
+                </label>
+                <select
+                  value={mode === 'whatsapp' ? phoneColumn : emailColumn}
+                  onChange={(e) => mode === 'whatsapp' ? setPhoneColumn(e.target.value) : setEmailColumn(e.target.value)}
+                  style={{ width: '100%', padding: '4px', background: '#171717', color: '#fafafa', border: '1px solid #262626', borderRadius: '4px', fontSize: '12px' }}
+                >
+                  <option value="">— Select —</option>
+                  {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
             </div>
           )}
         </section>
