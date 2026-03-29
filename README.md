@@ -128,5 +128,5 @@ MIT
 ---
 
 <p align="center">
-  Built by <a href="https://qobouli.com"><strong>Qobouli AI & Dev</strong></a> in Istanbul
+  Built by <a href="https://mk.qobouli.com"><strong>Qobouli AI & Dev</strong></a> in Istanbul
 </p>
