@@ -1,0 +1,174 @@
+# SendStack by Qobouli — Full Documentation
+
+> Free, open-source bulk email and WhatsApp messaging platform with CSV personalization, spin syntax, and anti-ban protection. أداة إرسال بريد إلكتروني وواتساب جماعي مجانية ومفتوحة المصدر.
+
+## Overview
+
+SendStack is a bulk messaging tool built by Qobouli AI & Dev. It enables users to send personalized emails and WhatsApp messages to hundreds of contacts using CSV data, template variables, and spin syntax. The platform is designed with privacy as a core principle — all data processing happens locally on the user's device.
+
+SendStack is available in two forms:
+1. **Web App** — A full-featured Next.js dashboard at https://sender.qobouli.com
+2. **Chrome Extension** — A lightweight sidebar that integrates directly into Gmail and WhatsApp Web
+
+---
+
+## Features in Detail
+
+### Bulk Email Sending via SMTP
+Connect any SMTP provider to send emails at scale:
+- **Gmail**: Use your Gmail account with app-specific passwords
+- **iCloud+**: Connect via iCloud Mail SMTP
+- **Outlook / Yahoo / Custom**: Any SMTP host, port, username, and password
+- Emails are sent one-by-one with configurable delays to avoid rate limiting
+- Full HTML support in email body
+
+### Bulk WhatsApp Messaging
+Send WhatsApp messages without an API key:
+- Authenticate by scanning a QR code (connects to WhatsApp Web)
+- Messages sent via whatsapp-web.js (open-source library)
+- Supports text messages and media attachments (images, PDFs, documents — up to 16MB)
+- Phone number validation before sending
+- Message delivery tracking: pending → sent → delivered → read
+
+### CSV Upload & Column Mapping
+- Drag-and-drop CSV upload
+- Auto-detects columns for email, phone number, and name
+- Supports any number of custom columns as template variables
+- Handles Arabic/RTL text in CSV files correctly
+- PapaParse-based parsing for robust CSV handling
+
+### Template Variables & Personalization
+- Use double curly braces: {{Name}}, {{Company}}, {{City}}, etc.
+- Any CSV column header becomes a usable variable
+- Live preview shows how messages will look for each recipient
+- Variables are substituted per-recipient at send time
+
+### Spin Syntax for Unique Messages
+- Write variants in curly braces with pipes: {Hello|Hi|Hey|Greetings}
+- Each recipient gets a randomly selected variant
+- Combine multiple spin groups in one message for exponential variation
+- Reduces spam detection and makes messages feel personal
+- Example: "{Hi|Hey} {{Name}}, {I wanted to reach out|just a quick note} about {{Company}}."
+
+### Anti-Ban Safety Features
+SendStack includes comprehensive anti-ban protection for WhatsApp:
+- **Per-message delays**: Configurable wait between each message (fast/normal/safe/custom)
+- **Random jitter**: Adds randomization to delays to mimic human behavior
+- **Batch cool-downs**: Pause between batches of messages
+- **Batch size limits**: Send N messages then pause
+- **Daily message limits**: Cap total messages per day
+- **Message variation via spin syntax**: Each message is unique
+
+### Real-Time Progress Tracking
+- Live counters for sent, failed, skipped, and queued messages
+- Cancel sending at any time
+- Detailed logs with timestamps and error details
+- Copy logs to clipboard for debugging
+
+### Chrome Extension
+Available as a Manifest V3 Chrome extension:
+- **Gmail Integration**: Sidebar overlay that automates the Gmail compose window
+- **WhatsApp Web Integration**: Sidebar for bulk messaging within WhatsApp Web
+- **Zero Backend**: Everything runs in the browser, no external servers
+- **Settings Sync**: Preferences sync across Chrome profiles
+- **Anti-Ban Presets**: Pre-configured delay profiles (fast, normal, safe)
+
+---
+
+## How It Works
+
+### Step 1: Upload Your CSV
+Prepare a CSV file with columns for email/phone and any personalization data. Drop it into SendStack. Columns are auto-detected.
+
+### Step 2: Configure Your Channel
+**For Email:** Enter your SMTP settings (host, port, username, password) or select a preset (Gmail, iCloud+).
+**For WhatsApp:** Scan the QR code to connect your WhatsApp account.
+
+### Step 3: Write Your Template
+Compose your message using {{ColumnName}} for personalization and {Option1|Option2|Option3} for spin syntax. Preview how it looks per recipient.
+
+### Step 4: Configure Safety Settings
+Set your delays, batch sizes, and daily limits. Choose a preset or customize.
+
+### Step 5: Hit Send
+Watch messages go out one by one with live progress. Cancel anytime.
+
+---
+
+## Privacy & Security
+
+- **Zero data collection**: No analytics, no telemetry, no tracking pixels
+- **No accounts required**: No sign-up, no login
+- **Local processing only**: CSV data, SMTP credentials, and messages never leave your device
+- **No external requests**: SendStack makes no outbound network requests except to send your messages via SMTP/WhatsApp
+- **Open-source**: Full source code available on GitHub for audit
+
+---
+
+## Frequently Asked Questions
+
+### Is SendStack free?
+Yes, completely free and open-source. No subscriptions, no hidden fees, no premium tier.
+
+### هل سيند ستاك مجاني؟
+نعم، مجاني بالكامل ومفتوح المصدر. لا اشتراكات ولا رسوم مخفية.
+
+### SendStack ücretsiz mi?
+Evet, tamamen ücretsiz ve açık kaynaklıdır. Abonelik veya gizli ücret yoktur.
+
+### Does it store my data?
+No. Everything runs in your browser session. CSV data, credentials, and messages stay on your device.
+
+### What SMTP providers work?
+Any SMTP provider: Gmail, iCloud+, Outlook, Yahoo, Zoho, SendGrid, Mailgun, Amazon SES, or any custom domain with SMTP access.
+
+### Will my WhatsApp get banned?
+SendStack includes anti-ban features (delays, jitter, batch limits, daily caps, spin syntax) to minimize risk. However, bulk messaging always carries some risk. Use responsibly and follow WhatsApp's terms of service.
+
+### Can I send attachments via WhatsApp?
+Yes. The web app supports media attachments including images, PDFs, documents, and more (up to 16MB per file, 16 supported MIME types).
+
+### What languages are supported?
+The interface supports English, Arabic (with full RTL layout), and Turkish. Messages can be in any language.
+
+---
+
+## Technical Architecture
+
+- **Frontend**: Next.js 16 (App Router) + React 19 + TypeScript 5
+- **Styling**: Tailwind CSS 4
+- **Email**: Nodemailer 8 (SMTP)
+- **WhatsApp**: whatsapp-web.js 1.34 + Puppeteer
+- **CSV Parsing**: PapaParse 5
+- **QR Codes**: qrcode library
+- **Icons**: Lucide React
+- **Chrome Extension**: Vite + React + @wppconnect/wa-js
+- **i18n**: Custom React Context with JSON translation files
+- **Hosting**: Vercel (web app), Chrome Web Store (extension)
+
+---
+
+## Differentiators
+
+| Feature | SendStack | Mailchimp | Lemlist | WhatSender |
+|---------|-----------|-----------|---------|------------|
+| Free | Yes (always) | Freemium | Paid | Freemium |
+| Open-source | Yes | No | No | No |
+| No account needed | Yes | No | No | No |
+| Fully offline | Yes | No | No | No |
+| Email + WhatsApp | Both | Email only | Email only | WhatsApp only |
+| Spin syntax | Yes | No | Yes | No |
+| Anti-ban protection | Yes | N/A | N/A | Limited |
+| Multilingual UI | EN/AR/TR | EN + others | EN + others | EN |
+| Chrome extension | Yes | No | Chrome extension | Chrome extension |
+
+---
+
+## Links
+
+- **Homepage**: https://sender.qobouli.com
+- **Dashboard**: https://sender.qobouli.com/dashboard
+- **Privacy Policy**: https://sender.qobouli.com/privacy
+- **Source Code**: https://github.com/mohamed-arabi16/Bulk-Email-sender
+- **Report Issues**: https://github.com/mohamed-arabi16/Bulk-Email-sender/issues
+- **Built by**: Qobouli AI & Dev — https://qobouli.com

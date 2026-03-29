@@ -58,7 +58,7 @@ const messageDefs: MessageDef[] = [
 ];
 
 function renderMessageText(template: string, names: { name: string; company?: string }, varClass: string) {
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.JSX.Element)[] = [];
     let remaining = template;
     let key = 0;
     const replacements = [

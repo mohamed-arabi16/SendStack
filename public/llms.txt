@@ -1,0 +1,37 @@
+# SendStack by Qobouli
+
+> Free, open-source bulk email and WhatsApp messaging platform. Upload a CSV, personalize with template variables, hit send. أداة إرسال بريد إلكتروني وواتساب جماعي مجانية.
+
+SendStack lets you send personalized bulk emails and WhatsApp messages directly from your browser. Upload a CSV with contacts, write a template with {{variables}}, and send at scale with built-in anti-ban protection. Everything runs locally — no data leaves your device.
+
+## Features
+- **Bulk Email via SMTP**: Works with Gmail, iCloud+, Outlook, Yahoo, and any custom SMTP domain
+- **Bulk WhatsApp Messaging**: Connect via QR code pairing to WhatsApp Web
+- **CSV Upload**: Auto-detects columns for email, phone, name, and custom fields
+- **Template Variables**: Use {{Name}}, {{Company}}, or any CSV column header as a variable
+- **Spin Syntax**: Write {Hello|Hi|Hey} and each recipient gets a random variant
+- **Anti-Ban Safety**: Per-message delays, random jitter, batch cool-downs, daily limits
+- **Live Progress**: Real-time sent/failed/skipped counters with cancel-anytime control
+- **100% Offline**: All data stays on your device. No external servers, no analytics, no tracking
+- **Chrome Extension**: Lightweight sidebar that lives inside Gmail and WhatsApp Web
+- **Multilingual**: Full support for English, Arabic (RTL), and Turkish
+
+## Pricing
+- Free: $0 — Completely free and open-source. No subscriptions, no hidden fees, no limits.
+
+## Languages
+- English — Default language
+- Arabic (العربية) — Full RTL layout support
+- Turkish (Türkçe) — Full translation
+
+## Links
+- Homepage: https://sender.qobouli.com
+- Privacy Policy: https://sender.qobouli.com/privacy
+- Source Code: https://github.com/mohamed-arabi16/Bulk-Email-sender
+- Built by: https://qobouli.com (Qobouli AI & Dev)
+
+## Technical
+- Platform: Web (Next.js) + Chrome Extension
+- Built with: Next.js 16, React 19, TypeScript, Tailwind CSS 4, Nodemailer, whatsapp-web.js
+- Fully client-side processing — no backend data storage
+- Open-source under GitHub
