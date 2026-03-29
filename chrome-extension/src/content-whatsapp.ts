@@ -37,12 +37,12 @@ async function injectPanel() {
   // Floating toggle button
   const toggleBtn = document.createElement('button');
   toggleBtn.id = 'bulk-sender-toggle';
-  toggleBtn.textContent = '💬 Bulk Sender';
+  toggleBtn.textContent = 'SendStack';
   toggleBtn.style.cssText = [
     'position:fixed', 'right:0', 'top:50%', 'transform:translateY(-50%)',
-    'z-index:99999', 'background:#25d366', 'color:#fff', 'border:none',
+    'z-index:99999', 'background:#10b981', 'color:#fff', 'border:none',
     'border-radius:8px 0 0 8px', 'padding:12px 10px', 'cursor:pointer',
-    'font-size:13px', 'font-family:sans-serif', 'writing-mode:vertical-rl',
+    'font-size:13px', 'font-family:-apple-system,BlinkMacSystemFont,sans-serif', 'writing-mode:vertical-rl',
     'text-orientation:mixed', 'box-shadow:-2px 0 8px rgba(0,0,0,0.2)',
   ].join(';');
   toggleBtn.addEventListener('click', togglePanel);

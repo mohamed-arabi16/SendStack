@@ -148,26 +148,33 @@ export default function App() {
   const progressPct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
 
   return (
-    <div style={{ fontFamily: 'sans-serif', fontSize: '13px', height: '100vh', overflowY: 'auto', background: '#fff', color: '#111' }}>
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif', fontSize: '13px', height: '100vh', overflowY: 'auto', background: '#0a0a0a', color: '#fafafa' }}>
       {/* Header */}
-      <div style={{ background: mode === 'email' ? '#1a73e8' : '#25d366', color: '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontWeight: 700, fontSize: '15px' }}>📨 Bulk Sender</span>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => setMode('email')} style={{ background: mode === 'email' ? '#fff' : 'transparent', color: mode === 'email' ? '#1a73e8' : '#fff', border: '1px solid #fff', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' }}>✉ Email</button>
-          <button onClick={() => setMode('whatsapp')} style={{ background: mode === 'whatsapp' ? '#fff' : 'transparent', color: mode === 'whatsapp' ? '#25d366' : '#fff', border: '1px solid #fff', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' }}>💬 WhatsApp</button>
+      <div style={{ background: '#171717', color: '#fafafa', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #262626' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <svg width="18" height="18" viewBox="0 0 72 72" fill="none">
+            <path d="M36 12L60 24L36 36L12 24L36 12Z" fill="#10b981" opacity="0.9"/>
+            <path d="M60 32L36 44L12 32" stroke="#34d399" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M60 42L36 54L12 42" stroke="#6ee7b7" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span style={{ fontWeight: 700, fontSize: '15px' }}>Send<span style={{ color: '#34d399' }}>Stack</span></span>
+        </div>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button onClick={() => setMode('email')} style={{ background: mode === 'email' ? '#10b981' : 'transparent', color: mode === 'email' ? '#fff' : '#a1a1aa', border: '1px solid #262626', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' }}>Email</button>
+          <button onClick={() => setMode('whatsapp')} style={{ background: mode === 'whatsapp' ? '#10b981' : 'transparent', color: mode === 'whatsapp' ? '#fff' : '#a1a1aa', border: '1px solid #262626', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' }}>WhatsApp</button>
         </div>
       </div>
 
       {/* Daily count */}
-      <div style={{ background: '#f8f9fa', padding: '6px 16px', fontSize: '12px', borderBottom: '1px solid #e0e0e0' }}>
-        📊 Today: <b>{dailyCount.sent}</b> / {dailyCount.limit} messages sent
+      <div style={{ background: '#171717', padding: '6px 16px', fontSize: '12px', borderBottom: '1px solid #262626', color: '#71717a' }}>
+        Today: <b style={{ color: '#a1a1aa' }}>{dailyCount.sent}</b> / {dailyCount.limit} messages sent
       </div>
 
       {/* Error banner */}
       {errorBanner && (
-        <div style={{ background: '#fce8e6', color: '#c5221f', padding: '8px 16px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>⚠️ {errorBanner}</span>
-          <button onClick={() => setErrorBanner('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c5221f', fontWeight: 700 }}>✕</button>
+        <div style={{ background: 'rgba(255, 59, 48, 0.15)', color: '#ff3b30', padding: '8px 16px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{errorBanner}</span>
+          <button onClick={() => setErrorBanner('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff3b30', fontWeight: 700 }}>✕</button>
         </div>
       )}
 
@@ -175,30 +182,30 @@ export default function App() {
 
         {/* CSV Upload */}
         <section>
-          <div style={{ fontWeight: 600, marginBottom: '6px' }}>📁 Contacts CSV</div>
+          <div style={{ fontWeight: 600, marginBottom: '6px', color: '#a1a1aa' }}>Contacts CSV</div>
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => fileInputRef.current?.click()}
-            style={{ border: '2px dashed #ccc', borderRadius: '6px', padding: '16px', textAlign: 'center', cursor: 'pointer', background: '#fafafa' }}
+            style={{ border: '2px dashed #262626', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', background: '#171717' }}
           >
             {contacts.length > 0
-              ? <span>✅ {contacts.length} contacts loaded ({headers.join(', ')})</span>
-              : <span>Drop CSV here or click to browse</span>}
+              ? <span style={{ color: '#34d399' }}>{contacts.length} contacts loaded ({headers.join(', ')})</span>
+              : <span style={{ color: '#71717a' }}>Drop CSV here or click to browse</span>}
           </div>
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]); }} />
-          {csvWarning && <div style={{ color: '#e65c00', fontSize: '12px', marginTop: '4px' }}>{csvWarning}</div>}
+          {csvWarning && <div style={{ color: '#ff9f0a', fontSize: '12px', marginTop: '4px' }}>{csvWarning}</div>}
         </section>
 
         {/* Template Editor */}
         <section>
-          <div style={{ fontWeight: 600, marginBottom: '6px' }}>✏️ Message Template</div>
+          <div style={{ fontWeight: 600, marginBottom: '6px', color: '#a1a1aa' }}>Message Template</div>
           {mode === 'email' && (
             <input
               placeholder="Subject (supports {{Variable}})"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              style={{ width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '6px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '6px 8px', border: '1px solid #262626', borderRadius: '6px', marginBottom: '6px', boxSizing: 'border-box', background: '#171717', color: '#fafafa' }}
             />
           )}
           <textarea
@@ -206,17 +213,17 @@ export default function App() {
             onChange={(e) => setTemplate(e.target.value)}
             rows={5}
             placeholder={'Hello {{Name}},\nYour message here.\n\nUse {Hi|Hello|Hey} for spin syntax.'}
-            style={{ width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', resize: 'vertical', fontFamily: 'monospace', fontSize: '12px', boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '6px 8px', border: '1px solid #262626', borderRadius: '6px', resize: 'vertical', fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: '12px', boxSizing: 'border-box', background: '#171717', color: '#fafafa' }}
           />
           {contacts.length > 0 && (
             <details style={{ marginTop: '6px' }}>
-              <summary style={{ cursor: 'pointer', color: '#666', fontSize: '12px' }}>👁 Preview (contact {previewIdx + 1} of {contacts.length})</summary>
+              <summary style={{ cursor: 'pointer', color: '#71717a', fontSize: '12px' }}>Preview (contact {previewIdx + 1} of {contacts.length})</summary>
               <div style={{ display: 'flex', gap: '6px', margin: '4px 0' }}>
-                <button onClick={() => setPreviewIdx(Math.max(0, previewIdx - 1))} disabled={previewIdx === 0} style={{ padding: '2px 8px', cursor: 'pointer' }}>‹</button>
-                <button onClick={() => setPreviewIdx(Math.min(contacts.length - 1, previewIdx + 1))} disabled={previewIdx === contacts.length - 1} style={{ padding: '2px 8px', cursor: 'pointer' }}>›</button>
+                <button onClick={() => setPreviewIdx(Math.max(0, previewIdx - 1))} disabled={previewIdx === 0} style={{ padding: '2px 8px', cursor: 'pointer', background: '#171717', color: '#a1a1aa', border: '1px solid #262626', borderRadius: '4px' }}>‹</button>
+                <button onClick={() => setPreviewIdx(Math.min(contacts.length - 1, previewIdx + 1))} disabled={previewIdx === contacts.length - 1} style={{ padding: '2px 8px', cursor: 'pointer', background: '#171717', color: '#a1a1aa', border: '1px solid #262626', borderRadius: '4px' }}>›</button>
               </div>
               <pre
-                style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                style={{ background: '#171717', padding: '8px', borderRadius: '6px', fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#a1a1aa', border: '1px solid #262626' }}
                 dangerouslySetInnerHTML={{ __html: safePreview }}
               />
             </details>
@@ -226,11 +233,11 @@ export default function App() {
         {/* Settings */}
         <section>
           <details>
-            <summary style={{ fontWeight: 600, cursor: 'pointer' }}>⚙️ Settings</summary>
+            <summary style={{ fontWeight: 600, cursor: 'pointer', color: '#a1a1aa' }}>Settings</summary>
             <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div>
-                <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px' }}>Delay Preset</label>
-                <select value={settings.delayPreset} onChange={(e) => setSettings({ ...settings, delayPreset: e.target.value as ExtensionSettings['delayPreset'] })} style={{ width: '100%', padding: '4px' }}>
+                <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px', color: '#71717a' }}>Delay Preset</label>
+                <select value={settings.delayPreset} onChange={(e) => setSettings({ ...settings, delayPreset: e.target.value as ExtensionSettings['delayPreset'] })} style={{ width: '100%', padding: '4px', background: '#171717', color: '#fafafa', border: '1px solid #262626', borderRadius: '4px' }}>
                   <option value="fast">Fast (5s)</option>
                   <option value="normal">Normal (10s)</option>
                   <option value="safe">Safe (15s)</option>
@@ -239,35 +246,35 @@ export default function App() {
               </div>
               {settings.delayPreset === 'custom' && (
                 <div>
-                  <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px' }}>Custom Delay (seconds, 3–60)</label>
-                  <input type="number" min={3} max={60} value={settings.customDelaySeconds} onChange={(e) => setSettings({ ...settings, customDelaySeconds: Math.max(3, Math.min(60, Number(e.target.value))) })} style={{ width: '100%', padding: '4px' }} />
+                  <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px', color: '#71717a' }}>Custom Delay (seconds, 3–60)</label>
+                  <input type="number" min={3} max={60} value={settings.customDelaySeconds} onChange={(e) => setSettings({ ...settings, customDelaySeconds: Math.max(3, Math.min(60, Number(e.target.value))) })} style={{ width: '100%', padding: '4px', background: '#171717', color: '#fafafa', border: '1px solid #262626', borderRadius: '4px' }} />
                 </div>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input type="checkbox" id="jitter" checked={settings.jitterEnabled} onChange={(e) => setSettings({ ...settings, jitterEnabled: e.target.checked })} />
-                <label htmlFor="jitter" style={{ fontSize: '12px' }}>Enable random jitter (±30–50%)</label>
+                <label htmlFor="jitter" style={{ fontSize: '12px', color: '#a1a1aa' }}>Enable random jitter (±30–50%)</label>
               </div>
               <div>
-                <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px' }}>Batch Size (min 5)</label>
-                <input type="number" min={5} max={100} value={settings.batchSize} onChange={(e) => setSettings({ ...settings, batchSize: Math.max(5, Number(e.target.value)) })} style={{ width: '100%', padding: '4px' }} />
+                <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px', color: '#71717a' }}>Batch Size (min 5)</label>
+                <input type="number" min={5} max={100} value={settings.batchSize} onChange={(e) => setSettings({ ...settings, batchSize: Math.max(5, Number(e.target.value)) })} style={{ width: '100%', padding: '4px', background: '#171717', color: '#fafafa', border: '1px solid #262626', borderRadius: '4px' }} />
               </div>
               <div>
-                <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px' }}>Batch Cool-down (seconds)</label>
-                <input type="number" min={10} max={600} value={settings.cooldownSeconds} onChange={(e) => setSettings({ ...settings, cooldownSeconds: Math.max(10, Number(e.target.value)) })} style={{ width: '100%', padding: '4px' }} />
+                <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px', color: '#71717a' }}>Batch Cool-down (seconds)</label>
+                <input type="number" min={10} max={600} value={settings.cooldownSeconds} onChange={(e) => setSettings({ ...settings, cooldownSeconds: Math.max(10, Number(e.target.value)) })} style={{ width: '100%', padding: '4px', background: '#171717', color: '#fafafa', border: '1px solid #262626', borderRadius: '4px' }} />
               </div>
               <div>
-                <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px' }}>Daily Limit</label>
-                <input type="number" min={1} max={1000} value={settings.dailyLimit} onChange={(e) => setSettings({ ...settings, dailyLimit: Math.max(1, Number(e.target.value)) })} style={{ width: '100%', padding: '4px' }} />
+                <label style={{ fontSize: '12px', display: 'block', marginBottom: '2px', color: '#71717a' }}>Daily Limit</label>
+                <input type="number" min={1} max={1000} value={settings.dailyLimit} onChange={(e) => setSettings({ ...settings, dailyLimit: Math.max(1, Number(e.target.value)) })} style={{ width: '100%', padding: '4px', background: '#171717', color: '#fafafa', border: '1px solid #262626', borderRadius: '4px' }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input type="checkbox" id="spin" checked={settings.spinSyntaxEnabled} onChange={(e) => setSettings({ ...settings, spinSyntaxEnabled: e.target.checked })} />
-                <label htmlFor="spin" style={{ fontSize: '12px' }}>Enable spin syntax {'{'+'A|B|C}'}</label>
+                <label htmlFor="spin" style={{ fontSize: '12px', color: '#a1a1aa' }}>Enable spin syntax {'{'+'A|B|C}'}</label>
               </div>
               <button
                 onClick={() => sendToBackground('SAVE_SETTINGS', settings as unknown as Record<string, unknown>).catch(console.error)}
-                style={{ padding: '6px', background: '#1a73e8', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                style={{ padding: '6px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
               >
-                💾 Save Settings
+                Save Settings
               </button>
             </div>
           </details>
@@ -278,28 +285,28 @@ export default function App() {
           <button
             onClick={startJob}
             disabled={status === 'sending' || status === 'cooldown'}
-            style={{ flex: 1, padding: '10px', background: status === 'sending' ? '#aaa' : mode === 'email' ? '#1a73e8' : '#25d366', color: '#fff', border: 'none', borderRadius: '6px', cursor: status === 'sending' ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '14px' }}
+            style={{ flex: 1, padding: '10px', background: status === 'sending' ? '#262626' : '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor: status === 'sending' ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '14px' }}
           >
-            {status === 'sending' ? '⏳ Sending...' : status === 'cooldown' ? `⏸ Cooldown ${cooldownRemaining}s` : '🚀 Send Now'}
+            {status === 'sending' ? 'Sending...' : status === 'cooldown' ? `Cooldown ${cooldownRemaining}s` : 'Send Now'}
           </button>
           {(status === 'sending' || status === 'cooldown') && (
-            <button onClick={cancelJob} style={{ padding: '10px 14px', background: '#d93025', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>✕ Cancel</button>
+            <button onClick={cancelJob} style={{ padding: '10px 14px', background: '#ff3b30', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancel</button>
           )}
         </section>
 
         {/* Progress */}
         {(status === 'sending' || status === 'cooldown' || status === 'completed') && (
           <section>
-            <div style={{ fontWeight: 600, marginBottom: '6px' }}>📈 Progress</div>
-            <div style={{ background: '#e0e0e0', borderRadius: '4px', overflow: 'hidden', height: '8px', marginBottom: '6px' }}>
-              <div style={{ height: '100%', background: mode === 'email' ? '#1a73e8' : '#25d366', width: `${progressPct}%`, transition: 'width 0.3s' }} />
+            <div style={{ fontWeight: 600, marginBottom: '6px', color: '#a1a1aa' }}>Progress</div>
+            <div style={{ background: '#262626', borderRadius: '4px', overflow: 'hidden', height: '8px', marginBottom: '6px' }}>
+              <div style={{ height: '100%', background: '#10b981', width: `${progressPct}%`, transition: 'width 0.3s' }} />
             </div>
-            <div style={{ fontSize: '12px', color: '#555', marginBottom: '6px' }}>
-              {progress.current} / {progress.total} &nbsp;|&nbsp; ✅ {progress.sent} &nbsp;|&nbsp; ❌ {progress.failed}
+            <div style={{ fontSize: '12px', color: '#71717a', marginBottom: '6px' }}>
+              {progress.current} / {progress.total} &nbsp;|&nbsp; <span style={{ color: '#34c759' }}>{progress.sent} sent</span> &nbsp;|&nbsp; <span style={{ color: '#ff3b30' }}>{progress.failed} failed</span>
             </div>
-            <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '11px', border: '1px solid #eee', borderRadius: '4px', padding: '6px' }}>
+            <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '11px', border: '1px solid #262626', borderRadius: '6px', padding: '6px', background: '#171717' }}>
               {logs.slice(-50).map((log, i) => (
-                <div key={i} style={{ color: log.status === 'success' ? '#137333' : log.status === 'error' ? '#c5221f' : '#777', marginBottom: '2px' }}>
+                <div key={i} style={{ color: log.status === 'success' ? '#34d399' : log.status === 'error' ? '#ff3b30' : '#71717a', marginBottom: '2px' }}>
                   {log.status === 'success' ? '✓' : log.status === 'error' ? '✗' : '—'} {log.recipient}{log.message ? ` — ${log.message}` : ''}
                 </div>
               ))}
@@ -309,9 +316,9 @@ export default function App() {
 
         {/* Summary */}
         {summary && (
-          <section style={{ background: '#e6f4ea', border: '1px solid #a8d5b5', borderRadius: '6px', padding: '12px' }}>
-            <div style={{ fontWeight: 600, marginBottom: '4px' }}>✅ Send Complete</div>
-            <div>Sent: <b>{summary.sent}</b> &nbsp; Failed: <b>{summary.failed}</b> &nbsp; Skipped: <b>{summary.skipped}</b></div>
+          <section style={{ background: 'rgba(52, 199, 89, 0.15)', border: '1px solid rgba(52, 199, 89, 0.3)', borderRadius: '8px', padding: '12px' }}>
+            <div style={{ fontWeight: 600, marginBottom: '4px', color: '#34c759' }}>Send Complete</div>
+            <div style={{ color: '#a1a1aa' }}>Sent: <b style={{ color: '#34d399' }}>{summary.sent}</b> &nbsp; Failed: <b style={{ color: '#ff3b30' }}>{summary.failed}</b> &nbsp; Skipped: <b style={{ color: '#71717a' }}>{summary.skipped}</b></div>
           </section>
         )}
       </div>
