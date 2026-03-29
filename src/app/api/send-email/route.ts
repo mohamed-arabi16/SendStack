@@ -21,6 +21,30 @@ type RouteError = {
   code?: number | string;
 };
 
+function isRouteError(value: unknown): value is RouteError {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  const isMessageValid = candidate.message === undefined || typeof candidate.message === 'string';
+  const isResponseCodeValid = candidate.responseCode === undefined || typeof candidate.responseCode === 'number';
+  const isCodeValid = candidate.code === undefined || typeof candidate.code === 'number' || typeof candidate.code === 'string';
+  return isMessageValid && isResponseCodeValid && isCodeValid;
+}
+
+function resolveSmtpPort(portValue: unknown): number {
+  const parsed = typeof portValue === 'number' ? portValue : Number(portValue);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 587;
+}
+
+function resolveErrorCode(error: RouteError): number {
+  if (typeof error.responseCode === 'number') return error.responseCode;
+  if (typeof error.code === 'number') return error.code;
+  if (typeof error.code === 'string') {
+    const parsed = Number(error.code);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as SendEmailRequest;
@@ -40,7 +64,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const port = Number(smtpConfig.port) || 587;
+    const port = resolveSmtpPort(smtpConfig.port);
     const isImplicitTLS = port === 465;
 
     const transporter = nodemailer.createTransport({
@@ -81,9 +105,9 @@ export async function POST(request: Request) {
 
     // Categorize error for better client-side messages
     let errorType = 'unknown';
-    const err = (error && typeof error === 'object' ? error : {}) as RouteError;
+    const err: RouteError = isRouteError(error) ? error : {};
     const msg = err.message || '';
-    const code = err.responseCode || err.code || 0;
+    const code = resolveErrorCode(err);
 
     if (msg.includes('Invalid login') || msg.includes('authentication') || code === 535) {
       errorType = 'auth';
