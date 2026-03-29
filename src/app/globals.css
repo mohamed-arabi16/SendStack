@@ -2,18 +2,18 @@
 
 /* ===== Design Tokens ===== */
 :root {
-    --bg-primary: #f5f5f7;
+    --bg-primary: #fafafa;
     --bg-card: rgba(255, 255, 255, 0.72);
     --bg-card-solid: #ffffff;
     --bg-hover: rgba(0, 0, 0, 0.03);
     --border-light: rgba(0, 0, 0, 0.08);
     --border-medium: rgba(0, 0, 0, 0.12);
-    --text-primary: #1d1d1f;
+    --text-primary: #0a0a0a;
     --text-secondary: #6e6e73;
     --text-tertiary: #86868b;
-    --accent: #0071e3;
-    --accent-hover: #0077ed;
-    --accent-light: rgba(0, 113, 227, 0.08);
+    --accent: #059669;
+    --accent-hover: #047857;
+    --accent-light: rgba(5, 150, 105, 0.08);
     --green: #34c759;
     --green-bg: rgba(52, 199, 89, 0.08);
     --red: #ff3b30;
@@ -33,18 +33,18 @@
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg-primary: #000000;
-        --bg-card: rgba(28, 28, 30, 0.72);
-        --bg-card-solid: #1c1c1e;
+        --bg-primary: #0a0a0a;
+        --bg-card: rgba(23, 23, 23, 0.72);
+        --bg-card-solid: #171717;
         --bg-hover: rgba(255, 255, 255, 0.06);
         --border-light: rgba(255, 255, 255, 0.08);
         --border-medium: rgba(255, 255, 255, 0.12);
-        --text-primary: #f5f5f7;
-        --text-secondary: #a1a1a6;
-        --text-tertiary: #86868b;
-        --accent: #0a84ff;
-        --accent-hover: #409cff;
-        --accent-light: rgba(10, 132, 255, 0.12);
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1aa;
+        --text-tertiary: #71717a;
+        --accent: #10b981;
+        --accent-hover: #34d399;
+        --accent-light: rgba(16, 185, 129, 0.12);
         --green-bg: rgba(52, 199, 89, 0.15);
         --red-bg: rgba(255, 59, 48, 0.15);
         --amber-bg: rgba(255, 159, 10, 0.15);
@@ -83,7 +83,7 @@ body {
     width: 600px;
     height: 600px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(0, 113, 227, 0.06) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.06) 0%, transparent 70%);
     pointer-events: none;
 }
 
@@ -125,13 +125,13 @@ body {
     width: 48px;
     height: 48px;
     border-radius: var(--radius-md);
-    background: linear-gradient(135deg, var(--accent), #5856d6);
+    background: linear-gradient(135deg, #10b981, #059669);
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
     flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.25);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
 }
 
 .header-title {
@@ -203,7 +203,7 @@ body {
 .step-number.active {
     background: var(--accent);
     color: white;
-    box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .step-number.completed {
@@ -259,7 +259,7 @@ body {
     border-color: var(--accent);
     background: var(--accent-light);
     transform: scale(1.01);
-    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
 }
 
 .upload-icon-wrapper {
@@ -420,7 +420,7 @@ body {
 .field-input:focus,
 .field-textarea:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.12);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
 }
 
 .field-textarea {
@@ -665,7 +665,7 @@ body {
 
 .btn-primary:hover:not(:disabled) {
     background: var(--accent-hover);
-    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.25);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
 }
 
 .btn-primary:disabled {
