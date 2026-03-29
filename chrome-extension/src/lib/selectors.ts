@@ -15,7 +15,7 @@ export interface SelectorDef {
 
 export const WHATSAPP_SELECTORS: SelectorDef[] = [
   { name: 'CHAT_LIST', selectors: ['#pane-side', '[data-testid="chat-list"]'], critical: true },
-  { name: 'MSG_INPUT', selectors: ['footer [contenteditable="true"]', '[data-testid="conversation-compose-box-input"]'], critical: true },
+  { name: 'MSG_INPUT', selectors: ['footer [contenteditable="true"]', '[data-testid="conversation-compose-box-input"]'], critical: false },
   { name: 'SEND_BUTTON', selectors: ['[data-testid="send"]', '[aria-label="Send"]', 'footer button[aria-label]'], critical: false },
   { name: 'INVALID_PHONE', selectors: ['[data-testid="intro-text"]'], critical: false },
 ];
